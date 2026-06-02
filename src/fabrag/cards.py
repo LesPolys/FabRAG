@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 from functools import cached_property
 from pathlib import Path
+from typing import ClassVar
 
 from pydantic import BaseModel
 
@@ -72,23 +73,44 @@ def parse_stat(raw: str | None) -> int | None:
 class Legality(BaseModel):
     """Per-format playability, straight from card.json's booleans.
 
-    FAB rotates cards out via the "Living Legend" system and bans/suspends others.
-    A card is *effectively* legal in a format only if it's legal AND not banned,
-    suspended, or retired to Living Legend.
+    All six formats the dataset tracks are stored losslessly. A card is
+    *effectively* legal in a format when it's legal AND not banned/suspended/
+    retired — but the exact rule differs per format because the formats expose
+    different flags:
+      - CC / Blitz : legal & not (banned | suspended | living_legend)
+      - Commoner   : legal & not (banned | suspended)
+      - Living Legend : legal & not banned   (`restricted` = max 1 copy, still legal)
+      - Silver Age : legal & not banned
+      - UPF        : not banned   (no per-card `legal` flag exists; ban-list only)
     """
 
+    # Classic Constructed
     cc_legal: bool
     cc_banned: bool
     cc_suspended: bool
     cc_living_legend: bool
+    # Blitz
     blitz_legal: bool
     blitz_banned: bool
     blitz_suspended: bool
     blitz_living_legend: bool
+    # Commoner
+    commoner_legal: bool
+    commoner_banned: bool
+    commoner_suspended: bool
+    # Living Legend
+    ll_legal: bool
+    ll_banned: bool
+    ll_restricted: bool
+    # Silver Age
+    silver_age_legal: bool
+    silver_age_banned: bool
+    # Ultimate Pit Fight (multiplayer) — ban-list only, no per-card legal flag
+    upf_banned: bool
 
     @property
     def is_cc_legal(self) -> bool:
-        """Effective Classic Constructed legality (the most common format)."""
+        """Effective Classic Constructed legality (the flagship format)."""
         return self.cc_legal and not (self.cc_banned or self.cc_suspended or self.cc_living_legend)
 
     @property
@@ -96,6 +118,54 @@ class Legality(BaseModel):
         return self.blitz_legal and not (
             self.blitz_banned or self.blitz_suspended or self.blitz_living_legend
         )
+
+    @property
+    def is_commoner_legal(self) -> bool:
+        return self.commoner_legal and not (self.commoner_banned or self.commoner_suspended)
+
+    @property
+    def is_ll_legal(self) -> bool:
+        # `restricted` limits a card to 1 copy but does NOT make it illegal.
+        return self.ll_legal and not self.ll_banned
+
+    @property
+    def is_silver_age_legal(self) -> bool:
+        return self.silver_age_legal and not self.silver_age_banned
+
+    @property
+    def is_upf_legal(self) -> bool:
+        return not self.upf_banned
+
+    @property
+    def by_format(self) -> dict[str, bool]:
+        """Effective legality keyed by canonical format name."""
+        return {
+            "cc": self.is_cc_legal,
+            "blitz": self.is_blitz_legal,
+            "commoner": self.is_commoner_legal,
+            "ll": self.is_ll_legal,
+            "silver_age": self.is_silver_age_legal,
+            "upf": self.is_upf_legal,
+        }
+
+    # Friendly aliases -> canonical keys used in `by_format`.
+    _FORMAT_ALIASES: ClassVar[dict[str, str]] = {
+        "classic_constructed": "cc",
+        "classic": "cc",
+        "living_legend": "ll",
+        "silverage": "silver_age",
+        "ultimate_pit_fight": "upf",
+        "pit_fight": "upf",
+    }
+
+    def is_legal(self, fmt: str) -> bool:
+        """Generic accessor, e.g. is_legal('cc'), is_legal('Living Legend')."""
+        key = fmt.strip().lower().replace(" ", "_").replace("-", "_")
+        key = self._FORMAT_ALIASES.get(key, key)
+        legal = self.by_format
+        if key not in legal:
+            raise ValueError(f"Unknown format {fmt!r}; valid: {sorted(legal)}")
+        return legal[key]
 
 
 class Card(BaseModel):
@@ -219,6 +289,15 @@ class Card(BaseModel):
                 blitz_banned=raw.get("blitz_banned", False),
                 blitz_suspended=raw.get("blitz_suspended", False),
                 blitz_living_legend=raw.get("blitz_living_legend", False),
+                commoner_legal=raw.get("commoner_legal", False),
+                commoner_banned=raw.get("commoner_banned", False),
+                commoner_suspended=raw.get("commoner_suspended", False),
+                ll_legal=raw.get("ll_legal", False),
+                ll_banned=raw.get("ll_banned", False),
+                ll_restricted=raw.get("ll_restricted", False),
+                silver_age_legal=raw.get("silver_age_legal", False),
+                silver_age_banned=raw.get("silver_age_banned", False),
+                upf_banned=raw.get("upf_banned", False),
             ),
         )
 
@@ -242,6 +321,13 @@ if __name__ == "__main__":
     print(f"Talents:     {sample.talents}")
     print(f"Categories:  {sample.categories}")
     print(f"Other types: {sample.other_types}")
-    print(f"CC legal:    {sample.legality.is_cc_legal}")
+    print(f"Legality:    {sample.legality.by_format}")
+    print(f"is_legal('Classic Constructed') -> {sample.legality.is_legal('Classic Constructed')}")
     print("\n--- text_for_embedding ---")
     print(sample.text_for_embedding)
+
+    # Per-format legal counts across the whole set.
+    print("\n--- legal cards per format ---")
+    for fmt in ("cc", "blitz", "commoner", "ll", "silver_age", "upf"):
+        n = sum(1 for c in cards if c.legality.is_legal(fmt))
+        print(f"  {fmt:12} {n:,}")
