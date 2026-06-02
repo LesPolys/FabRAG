@@ -1,0 +1,9 @@
+# Normalize line endings: store everything as LF in the repo.
+# Keeps diffs clean and stable across Windows/macOS/Linux and editors.
+* text=auto eol=lf
+
+# Treat these as binary (never touch line endings, never try to diff as text).
+*.faiss binary
+*.npy   binary
+*.png   binary
+*.jpg   binary
