@@ -1,0 +1,29 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets / local config
+.env
+.env.*
+
+# Downloaded datasets & generated indexes (large, regenerable — fetched/built by scripts)
+data/raw/
+data/index/
+*.faiss
+*.npy
+
+# Editor / OS cruft
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Scratch / experiments
+scratch_*.py
