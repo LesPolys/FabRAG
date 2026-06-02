@@ -49,7 +49,7 @@ uv sync
 ## Roadmap
 
 - [x] **Phase 0** — Toolchain & environment (uv, Ollama, models, verified pipeline)
-- [ ] **Phase 1** — Data layer: source + normalize FAB card data into validated objects
+- [x] **Phase 1** — Data layer: 4,285 cards normalized into validated `Card` objects, with the structured-metadata / free-text split that drives hybrid retrieval
 - [ ] **Phase 2** — Core RAG (CLI): chunk → embed → store → retrieve → generate, by hand
 - [ ] **Phase 3** — Swap hand-rolled search for a FAISS vector index
 - [ ] **Phase 4** — Hybrid retrieval: metadata filtering + reranking
