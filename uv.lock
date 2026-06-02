@@ -36,16 +36,18 @@ wheels = [
 [[package]]
 name = "fabrag"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "numpy" },
     { name = "ollama" },
+    { name = "pydantic" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "ollama", specifier = ">=0.6.2" },
+    { name = "pydantic", specifier = ">=2.13.4" },
 ]
 
 [[package]]
