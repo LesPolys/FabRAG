@@ -14,6 +14,7 @@ filters answer "is this a legal blue Wizard card?", embeddings answer "is this c
 from __future__ import annotations
 
 import json
+import re
 from functools import cached_property
 from pathlib import Path
 from typing import ClassVar
@@ -50,6 +51,30 @@ CARD_CATEGORIES: frozenset[str] = frozenset({
     "Invocation", "Evo", "Base", "Event", "Affliction", "Companion",
     "Construct", "Macro",
 })
+
+
+# FAB card text uses curly-brace symbols (e.g. "Gain 3{h}", "+4{p}") that are
+# opaque to an embedding model. Expanding them to real words is essential for
+# semantic search — without it, "Gain 3{h}" does NOT land near "gain life".
+# Meanings inferred from the data; leading spaces keep "3{h}" -> "3 life".
+SYMBOLS: dict[str, str] = {
+    "{p}": " power",
+    "{r}": " resource",
+    "{d}": " defense",
+    "{h}": " life",
+    "{i}": " intellect",
+    "{t}": " tap",
+    "{u}": " untap",
+    "{c}": " chi",
+}
+
+
+def expand_symbols(text: str) -> str:
+    """Replace FAB's curly-brace game symbols with words, for embedding."""
+    text = text.replace("{r]", "{r}")  # repair a malformed token in the source data
+    for sym, word in SYMBOLS.items():
+        text = text.replace(sym, word)
+    return re.sub(r"[ \t]{2,}", " ", text)  # collapse the spaces we introduced
 
 
 def parse_stat(raw: str | None) -> int | None:
@@ -254,7 +279,7 @@ class Card(BaseModel):
         if self.traits:
             parts.append("Traits: " + ", ".join(self.traits))
         if self.text:
-            parts.append(self.text)
+            parts.append(expand_symbols(self.text))  # {h} -> life, {p} -> power, ...
         return "\n".join(parts)
 
     # ---- construction from a raw card.json record ---------------------------
