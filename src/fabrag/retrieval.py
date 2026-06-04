@@ -25,7 +25,7 @@ those earn their keep at millions of vectors, not thousands.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -132,18 +132,32 @@ class Retriever:
 
     # ---- search --------------------------------------------------------------
     def search(
-        self, query: str, k: int = 10, filters: CardFilter | None = None
+        self,
+        query: str,
+        k: int = 10,
+        filters: CardFilter | None = None,
+        predicate: Callable[[Card], bool] | None = None,
     ) -> list[SearchResult]:
         """Hybrid search: filter the corpus, then rank survivors by meaning.
+
+        `filters` are declarative metadata constraints; `predicate` is an
+        arbitrary per-card test (e.g. deck.hero_pool_predicate) for rules that
+        CardFilter's any-of matching can't express. Both must pass.
 
         Returns up to `k` results, most relevant first.
         """
         # 1. STRUCTURED: which card rows survive the hard constraints?
-        if filters is None or filters.is_empty():
+        has_filters = filters is not None and not filters.is_empty()
+        if not has_filters and predicate is None:
             rows = np.arange(len(self.cards))
         else:
             rows = np.array(
-                [i for i, c in enumerate(self.cards) if filters.matches(c)],
+                [
+                    i
+                    for i, c in enumerate(self.cards)
+                    if (not has_filters or filters.matches(c))
+                    and (predicate is None or predicate(c))
+                ],
                 dtype=np.intp,
             )
         if rows.size == 0:

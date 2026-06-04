@@ -17,9 +17,10 @@ for a different consumer.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
-from .cards import expand_symbols
+from .cards import Card, expand_symbols
 from .generation import generate, generate_stream
 from .retrieval import CardFilter, Retriever, SearchResult
 
@@ -94,10 +95,14 @@ def get_retriever() -> Retriever:
 
 
 def _retrieve(
-    question: str, k: int, filters: CardFilter | None, retriever: Retriever | None
+    question: str,
+    k: int,
+    filters: CardFilter | None,
+    predicate: Callable[[Card], bool] | None,
+    retriever: Retriever | None,
 ) -> tuple[list[SearchResult], str]:
     retriever = retriever if retriever is not None else get_retriever()
-    results = retriever.search(question, k=k, filters=filters)
+    results = retriever.search(question, k=k, filters=filters, predicate=predicate)
     return results, format_context(results)
 
 
@@ -106,10 +111,15 @@ def answer(
     *,
     k: int = 8,
     filters: CardFilter | None = None,
+    predicate: Callable[[Card], bool] | None = None,
     retriever: Retriever | None = None,
 ) -> RagResponse:
-    """Full RAG: retrieve cards for `question`, then generate a grounded answer."""
-    results, context = _retrieve(question, k, filters, retriever)
+    """Full RAG: retrieve cards for `question`, then generate a grounded answer.
+
+    `predicate` (e.g. deck.hero_pool_predicate) restricts retrieval to a hero's
+    legal card pool, so the answer only ever suggests deck-legal cards.
+    """
+    results, context = _retrieve(question, k, filters, predicate, retriever)
     if not results:
         return RagResponse(_NO_MATCH_MSG, [])
     return RagResponse(generate(question, context), results)
@@ -120,6 +130,7 @@ def answer_stream(
     *,
     k: int = 8,
     filters: CardFilter | None = None,
+    predicate: Callable[[Card], bool] | None = None,
     retriever: Retriever | None = None,
 ):
     """Like answer(), but return (results, token_iterator) for live CLI output.
@@ -127,7 +138,7 @@ def answer_stream(
     Results come back immediately (retrieval is fast) so the caller can show
     citations while the answer streams in.
     """
-    results, context = _retrieve(question, k, filters, retriever)
+    results, context = _retrieve(question, k, filters, predicate, retriever)
     if not results:
         return [], iter([_NO_MATCH_MSG])
     return results, generate_stream(question, context)

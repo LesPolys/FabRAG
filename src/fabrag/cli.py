@@ -19,8 +19,10 @@ from __future__ import annotations
 import argparse
 import sys
 
+from . import rag
+from .deck import find_hero, hero_pool_predicate
 from .rag import answer_stream
-from .retrieval import CardFilter, Retriever, SearchResult
+from .retrieval import CardFilter, SearchResult
 
 
 # --- filters: shared across both subcommands ---------------------------------
@@ -42,6 +44,9 @@ def _add_filter_args(p: argparse.ArgumentParser) -> None:
                    help="keyword, e.g. 'Go Again' (repeatable, any-of)")
     p.add_argument("--legal", dest="legal_in", metavar="FORMAT",
                    help="restrict to a legal format: cc / blitz / commoner / ll / silver_age / upf")
+    p.add_argument("--hero", metavar="NAME",
+                   help="restrict to a hero's legal deck pool (class/talent/legality); "
+                        "uses --legal's format, else cc")
 
 
 def _filter_from_args(args: argparse.Namespace) -> CardFilter:
@@ -79,11 +84,36 @@ def _print_results(results: list[SearchResult]) -> None:
               f"{_stat_line(r.card)}")
 
 
+# --- hero pool ---------------------------------------------------------------
+def _resolve_hero_predicate(args: argparse.Namespace):
+    """If --hero was given, return (predicate, banner); else (None, None).
+
+    Resolves the hero from the shared corpus and builds a pool predicate for the
+    chosen format. Raises ValueError (caught by the caller) on a bad hero name.
+    """
+    if not args.hero:
+        return None, None
+    hero = find_hero(args.hero, rag.get_retriever().cards)
+    fmt = args.legal_in or "cc"
+    talents = ", ".join(hero.talents) or "none"
+    banner = (f"Hero: {hero.name} — {'/'.join(hero.classes) or 'classless'} "
+              f"(talents: {talents}); pool format: {fmt}\n")
+    return hero_pool_predicate(hero, fmt), banner
+
+
 # --- subcommands -------------------------------------------------------------
 def _cmd_search(args: argparse.Namespace) -> int:
     filters = _filter_from_args(args)
-    retriever = Retriever.load_or_build()
-    results = retriever.search(args.query, k=args.k, filters=filters)
+    try:
+        predicate, banner = _resolve_hero_predicate(args)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+    if banner:
+        print(banner)
+    results = rag.get_retriever().search(
+        args.query, k=args.k, filters=filters, predicate=predicate
+    )
     if not results:
         print("No cards matched your query and filters.")
         return 0
@@ -93,7 +123,16 @@ def _cmd_search(args: argparse.Namespace) -> int:
 
 def _cmd_ask(args: argparse.Namespace) -> int:
     filters = _filter_from_args(args)
-    results, stream = answer_stream(args.query, k=args.k, filters=filters)
+    try:
+        predicate, banner = _resolve_hero_predicate(args)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+    if banner:
+        print(banner)
+    results, stream = answer_stream(
+        args.query, k=args.k, filters=filters, predicate=predicate
+    )
     for piece in stream:        # tokens arrive live
         print(piece, end="", flush=True)
     print()
