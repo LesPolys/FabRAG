@@ -8,10 +8,10 @@
   },
   {
     "id": "card-prevent-arcane-damage",
-    "query": "cards that prevent arcane damage dealt to me",
+    "query": "equipment I can destroy to prevent arcane damage",
     "kind": "card",
-    "expected": ["Enchanted Quiver", "Light Up the Leaves", "Misfire Dampener", "Tremorshield Sabatons"],
-    "notes": "Truth via exact text search: 'prevent the next N arcane damage'."
+    "expected": ["Enchanted Quiver", "Misfire Dampener", "Tremorshield Sabatons"],
+    "notes": "All three equipment with 'Instant - Destroy this: Prevent the next 1 arcane damage'. Original phrasing ('cards that prevent arcane damage') had ~50 true answers (43 Arcane Barrier cards, Dampen, ...) and was unanswerable at k=8 — gold-set bug found by the eval itself."
   },
   {
     "id": "card-freeze-arsenal",

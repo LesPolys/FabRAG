@@ -35,6 +35,7 @@ from .cards import Card, expand_symbols
 from .generation import generate, generate_stream
 from .retrieval import (
     CardFilter,
+    Mode,
     Retriever,
     SearchResult,
     Source,
@@ -134,6 +135,7 @@ def retrieve(
     *,
     k: int = 8,
     source: Source = "all",
+    mode: Mode = "hybrid",
     filters: CardFilter | None = None,
     predicate: Callable[[Card], bool] | None = None,
     retriever: Retriever | None = None,
@@ -152,14 +154,14 @@ def retrieve(
     retriever = retriever if retriever is not None else get_retriever()
     if source != "all":
         return retriever.search(
-            question, k=k, predicate=scope(source, filters, predicate)
+            question, k=k, predicate=scope(source, filters, predicate), mode=mode
         )
     k_rules = max(2, round(k * 0.3))
     k_cards = max(1, k - k_rules)
     cards = retriever.search(
-        question, k=k_cards, predicate=scope("cards", filters, predicate)
+        question, k=k_cards, predicate=scope("cards", filters, predicate), mode=mode
     )
-    rules = retriever.search(question, k=k_rules, predicate=scope("rules"))
+    rules = retriever.search(question, k=k_rules, predicate=scope("rules"), mode=mode)
     return cards + rules
 
 

@@ -39,7 +39,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from .cards import Card
-from .retrieval import Retriever, SearchResult, Source
+from .retrieval import Mode, Retriever, SearchResult, Source
 from .rules import RuleChunk
 
 # Hand-authored, version-controlled (unlike data/raw — this is NOT regenerable).
@@ -226,6 +226,7 @@ def evaluate(
     *,
     k: int = 8,
     source: Source | Literal["per-kind"] = "all",
+    mode: Mode = "hybrid",
     retriever: Retriever | None = None,
 ) -> EvalReport:
     """Run every case through the production retrieval path and score it.
@@ -252,14 +253,19 @@ def evaluate(
         return source
 
     results = [
-        score_case(case, retrieve(case.query, k=k, source=src(case), retriever=retriever))
+        score_case(
+            case,
+            retrieve(case.query, k=k, source=src(case), mode=mode, retriever=retriever),
+        )
         for case in cases
     ]
-    return EvalReport(results, k=k, source=source)
+    return EvalReport(results, k=k, source=f"{source}/{mode}")
 
 
 if __name__ == "__main__":
+    # The A/B that justifies (or kills) hybrid retrieval: same gold set, same
+    # k, per-kind isolation — only the ranking mode varies.
     cases = load_gold_set()
-    for source in ("all", "per-kind"):
-        print(evaluate(cases, source=source).render())
+    for mode in ("dense", "lexical", "hybrid"):
+        print(evaluate(cases, source="per-kind", mode=mode).render())
         print()
