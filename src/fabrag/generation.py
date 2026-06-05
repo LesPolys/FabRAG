@@ -28,6 +28,11 @@ CHAT_MODEL = "qwen2.5:7b"
 # the model to stick to the cards, not embellish.
 DEFAULT_TEMPERATURE = 0.2
 
+# Ollama's default context window (often 4096) TRUNCATES SILENTLY — with
+# Phase 8's bigger rule chunks (up to ~4400 chars each), a k=8 mixed context
+# could lose its tail without any error. 8k tokens covers the worst case.
+NUM_CTX = 8192
+
 SYSTEM_PROMPT = """\
 You are FabRAG, an expert assistant for the Flesh and Blood (FAB) trading card game.
 
@@ -69,7 +74,7 @@ def generate(
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": _user_prompt(question, context)},
         ],
-        options={"temperature": temperature},
+        options={"temperature": temperature, "num_ctx": NUM_CTX},
     )
     return resp.message.content
 
@@ -88,7 +93,7 @@ def generate_stream(
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": _user_prompt(question, context)},
         ],
-        options={"temperature": temperature},
+        options={"temperature": temperature, "num_ctx": NUM_CTX},
         stream=True,
     )
     for chunk in stream:
