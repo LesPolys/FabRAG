@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FabRAG — Flesh and Blood deck assistant</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>FabRAG</h1>
+    <nav>
+      <button class="tab active" data-tab="search">Search</button>
+      <button class="tab" data-tab="ask">Ask</button>
+      <button class="tab" data-tab="build">Build</button>
+    </nav>
+  </header>
+
+  <!-- ============ SEARCH ============ -->
+  <main id="tab-search" class="panel active">
+    <form id="search-form" class="controls">
+      <input id="search-q" type="text" placeholder="search cards and rules… e.g. “freeze a card in arsenal”" autofocus>
+      <select id="search-source">
+        <option value="cards" selected>cards</option>
+        <option value="rules">rules</option>
+        <option value="all">cards + rules</option>
+      </select>
+      <input id="search-hero" type="text" placeholder="hero pool (optional)" size="16">
+      <select id="search-k">
+        <option>12</option><option selected>24</option><option>48</option>
+      </select>
+      <button type="submit">Search</button>
+    </form>
+    <div id="search-status" class="status"></div>
+    <div id="search-rules" class="rule-list"></div>
+    <div id="search-grid" class="card-grid"></div>
+  </main>
+
+  <!-- ============ ASK ============ -->
+  <main id="tab-ask" class="panel">
+    <form id="ask-form" class="controls">
+      <input id="ask-q" type="text" placeholder="ask anything… e.g. “what does dominate do?”">
+      <select id="ask-source">
+        <option value="all" selected>cards + rules</option>
+        <option value="cards">cards</option>
+        <option value="rules">rules</option>
+      </select>
+      <button type="submit">Ask</button>
+    </form>
+    <div id="ask-answer" class="answer"></div>
+    <h3 id="ask-grounding-title" class="hidden">Grounded in</h3>
+    <div id="ask-rules" class="rule-list"></div>
+    <div id="ask-grid" class="card-grid small"></div>
+  </main>
+
+  <!-- ============ BUILD ============ -->
+  <main id="tab-build" class="panel">
+    <form id="build-form" class="controls">
+      <input id="build-hero" type="text" placeholder="hero, e.g. Iyslander" required>
+      <input id="build-strategy" type="text" placeholder="strategy, e.g. “control with arcane damage”" size="34">
+      <select id="build-format">
+        <option value="cc">Classic Constructed (60)</option>
+        <option value="blitz" selected>Blitz (40)</option>
+        <option value="commoner">Commoner (40)</option>
+      </select>
+      <button type="submit">Build deck</button>
+    </form>
+    <div id="build-status" class="status"></div>
+    <div id="build-result" class="hidden">
+      <div id="build-meta" class="build-meta"></div>
+      <div id="build-deck"></div>
+      <h3>Game plan</h3>
+      <div id="build-explanation" class="answer"></div>
+    </div>
+  </main>
+
+  <!-- hover zoom + lightbox share one floating image -->
+  <img id="zoom" class="hidden" alt="">
+  <div id="lightbox" class="hidden"><img alt=""></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
