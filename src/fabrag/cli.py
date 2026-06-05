@@ -115,6 +115,28 @@ def _resolve_hero_predicate(args: argparse.Namespace):
 
 
 # --- subcommands -------------------------------------------------------------
+def _cmd_eval(args: argparse.Namespace) -> int:
+    """Run the gold-set retrieval eval (and optionally the grounding eval).
+
+    Retrieval is cheap (one query embedding per case); grounding is slow (one
+    or two chat-model calls per question), so it's opt-in via --grounding N.
+    """
+    from .evaluation import evaluate, load_gold_set
+
+    cases = load_gold_set()
+    print(evaluate(cases, k=args.k, source=args.eval_source, mode=args.mode).render())
+
+    if args.grounding:
+        from .grounding import grounding_eval, render_grounding
+
+        questions = [c.query for c in cases][: args.grounding]
+        print()
+        print(render_grounding(
+            grounding_eval(questions, k=args.k, use_judge=not args.no_judge)
+        ))
+    return 0
+
+
 def _cmd_search(args: argparse.Namespace) -> int:
     filters = _filter_from_args(args)
     try:
@@ -175,6 +197,21 @@ def main(argv: list[str] | None = None) -> int:
     p_ask = sub.add_parser("ask", help="ask a question, get a grounded answer")
     _add_filter_args(p_ask)
     p_ask.set_defaults(func=_cmd_ask)
+
+    p_eval = sub.add_parser("eval", help="run the gold-set evaluation suite")
+    p_eval.add_argument("-k", "--top-k", type=int, default=8, dest="k",
+                        help="retrieval depth to evaluate at (default: 8)")
+    p_eval.add_argument("--source", choices=("all", "per-kind", "cards", "rules"),
+                        default="per-kind", dest="eval_source",
+                        help="'all' = production pipeline; 'per-kind' = each case "
+                             "vs its own corpus, the clean ranking lens (default)")
+    p_eval.add_argument("--mode", choices=("hybrid", "dense", "lexical"),
+                        default="hybrid", help="ranking mode under test (default: hybrid)")
+    p_eval.add_argument("--grounding", type=int, metavar="N", default=0,
+                        help="also grade N generated answers for grounding (slow)")
+    p_eval.add_argument("--no-judge", action="store_true",
+                        help="grounding: skip the LLM judge, citation audit only")
+    p_eval.set_defaults(func=_cmd_eval)
 
     args = parser.parse_args(argv)
     return args.func(args)
