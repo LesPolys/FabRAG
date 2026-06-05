@@ -47,22 +47,28 @@ Living Legend, Silver Age, UPF), stored losslessly.
 
 ---
 
-## 🔜 Phase 4 — Rules-text corpus & multi-source retrieval
-*Goal: chunking + heterogeneous-corpus RAG — the most common real-world RAG
-pattern, and one cards let us skip (each card is conveniently one document).*
+## ✅ Phase 4 — Rules-text corpus & multi-source retrieval
+*Chunking + heterogeneous-corpus RAG — the most common real-world RAG pattern.*
 
-1. **Source** the FAB rules text (comprehensive rulebook + keyword glossary)
-   into `data/raw/`. *(Decision: which official/permitted source.)*
-2. **Chunk** the prose by section/heading with size limits + overlap; learn why
-   chunk size is a real tuning knob.
-3. **Generalize the index** — a `Document` abstraction so `Retriever` embeds both
-   `Card`s and `RuleChunk`s. Refactors `retrieval.py` from Card-specific to
-   source-agnostic (the largest structural change in the plan).
-4. **Mixed results** — retrieval returns cards *and* rules; context formatting
-   renders each by type; `fabrag ask` can cite a rule. Add `--source
-   cards|rules|all`.
+- **Source** (`scripts/fetch_rules.py`): the CR as semantic HTML from
+  rules.fabtcg.com (every rule paragraph carries its citable id) + the PDF
+  kept as a future extraction-quality comparison. *(Decision: HTML primary.)*
+- **Chunking** (`rules.py`): structure-aware — rule+subrules+examples form
+  atomic groups packed into per-section chunks; oversized groups split at
+  subrule boundaries with the parent rule repeated (surgical overlap). 581
+  chunks across three sources (CR rules / CR glossary / keyword.json).
+- **`Document` protocol** (`retrieval.py`): structural typing reduces
+  "retrievable" to `doc_id` + `text_for_embedding`; card-specific filtering
+  moved up into `scope()`; per-source cached indexes merged at runtime.
+- **Mixed results**: measured the heterogeneous-corpus trap (cards score
+  ~0.03 hotter than rule chunks → the right rule ranked 18th), fixed with
+  per-source top-k quotas. `--source cards|rules|all` on both commands;
+  `fabrag ask` cites rules with deep links.
+- **Carried to Phase 5**: tune chunk size + quota split with the eval
+  harness; observed one confabulated rule-number citation (true content,
+  wrong attribution) — exactly what the grounding eval must catch.
 
-## ⬜ Phase 5 — Evaluation harness
+## 🔜 Phase 5 — Evaluation harness
 *Goal: measure RAG quality — retrieval metrics + answer grounding — before
 building the hardest component, so it guards against regressions.*
 

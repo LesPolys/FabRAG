@@ -247,6 +247,11 @@ class Card(BaseModel):
         return [t for t in self.types if t not in known]
 
     @property
+    def doc_id(self) -> str:
+        """Stable id under the retrieval Document protocol (see retrieval.py)."""
+        return self.unique_id
+
+    @property
     def is_generic(self) -> bool:
         return "Generic" in self.types
 
