@@ -109,51 +109,80 @@ function renderResults(results, gridEl, rulesEl, { append = false } = {}) {
   }
 }
 
-/* ---------- search (with Load-more paging) ----------
- * Ranked results page by offset: each "Load more" fetches the next slice of
- * the same ranking and APPENDS, so the grid grows in relevance order. */
-let searchOffset = 0;
-let searchShown = 0;
-
-async function runSearch({ append = false } = {}) {
+/* ---------- search (numbered pages + sorting) ----------
+ * The server sorts the FULL result set then slices the requested page, so
+ * page 1 of "cost ascending" is the cheapest matches overall. The pager
+ * renders a window of page numbers around the current one. */
+async function runSearch(pageNum = 1) {
   const k = parseInt($("search-k").value, 10);
-  if (!append) { searchOffset = 0; searchShown = 0; }
   const params = new URLSearchParams({
     q: $("search-q").value,
     source: $("search-source").value,
+    sort: $("search-sort").value,
     k: String(k),
-    offset: String(searchOffset),
+    page: String(pageNum),
   });
   const hero = $("search-hero").value.trim();
   if (hero) params.set("hero", hero);
 
   const status = $("search-status");
-  const moreBtn = $("search-more");
-  status.textContent = append ? "" : "searching…";
-  moreBtn.disabled = true;
+  status.textContent = "searching…";
   try {
     const resp = await fetch("/api/search?" + params);
     if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
     const data = await resp.json();
-    renderResults(data.results, $("search-grid"), $("search-rules"), { append });
-    searchShown += data.results.length;
-    searchOffset += k;
-    status.textContent = searchShown
-      ? `showing top ${searchShown}` + (data.has_more ? "" : " — end of results")
+    renderResults([...data.rules, ...data.cards], $("search-grid"), $("search-rules"));
+    const totalLabel = data.total === 500 ? "500+" : data.total; // server caps at 500
+    status.textContent = data.total
+      ? `${totalLabel} result${data.total === 1 ? "" : "s"} · page ${data.page} of ${data.pages}`
       : "nothing matched";
-    moreBtn.classList.toggle("hidden", !data.has_more);
+    renderPager(data.page, data.pages);
+    scrollTo({ top: 0, behavior: "smooth" });
   } catch (err) {
     status.textContent = "error: " + err.message;
-  } finally {
-    moreBtn.disabled = false;
+    $("search-pager").replaceChildren();
+  }
+}
+
+function renderPager(current, pages) {
+  const pager = $("search-pager");
+  pager.replaceChildren();
+  if (pages <= 1) return;
+
+  // windowed page list: 1 … (c-2 c-1 c c+1 c+2) … N
+  const want = new Set([1, pages]);
+  for (let p = current - 2; p <= current + 2; p++) {
+    if (p >= 1 && p <= pages) want.add(p);
+  }
+  const list = [...want].sort((a, b) => a - b);
+
+  const add = (p) => {
+    const b = document.createElement("button");
+    b.textContent = p;
+    if (p === current) b.classList.add("current");
+    else b.addEventListener("click", () => runSearch(p));
+    pager.appendChild(b);
+  };
+  let prev = 0;
+  for (const p of list) {
+    if (p - prev > 1) {
+      const gap = document.createElement("span");
+      gap.className = "gap";
+      gap.textContent = "…";
+      pager.appendChild(gap);
+    }
+    add(p);
+    prev = p;
   }
 }
 
 $("search-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  runSearch();
+  runSearch(1);
 });
-$("search-more").addEventListener("click", () => runSearch({ append: true }));
+$("search-sort").addEventListener("change", () => {
+  if ($("search-q").value.trim()) runSearch(1);
+});
 
 /* ---------- ask (SSE streaming) ---------- */
 let askSource = null;

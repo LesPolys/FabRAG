@@ -162,12 +162,13 @@ nav { display: flex; gap: 0.4rem; }
 .pitch-group.loadout h3 { border-color: var(--accent); }
 .spin::after { content: " ⏳"; }
 
-/* --- load more --------------------------------------------------------------- */
-.more-row { display: flex; justify-content: center; margin: 1.2rem 0; }
-#search-more {
-  background: var(--panel); color: var(--accent);
-  border: 1px solid var(--accent); border-radius: 6px;
-  padding: 0.55rem 1.6rem; cursor: pointer; font-size: 0.95rem;
+/* --- pager ------------------------------------------------------------------- */
+.pager { display: flex; justify-content: center; gap: 0.3rem; margin: 1.2rem 0; flex-wrap: wrap; }
+.pager button {
+  background: var(--panel); color: var(--muted);
+  border: 1px solid #333; border-radius: 6px;
+  min-width: 2.4rem; padding: 0.4rem 0.6rem; cursor: pointer; font-size: 0.9rem;
 }
-#search-more:hover { background: var(--accent); color: #14161a; }
-#search-more:disabled { opacity: 0.5; cursor: wait; }
+.pager button:hover { color: var(--ink); border-color: var(--accent); }
+.pager button.current { color: #14161a; background: var(--accent); border-color: var(--accent); font-weight: 700; }
+.pager .gap { color: var(--muted); align-self: center; padding: 0 0.2rem; }

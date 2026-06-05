@@ -26,6 +26,14 @@
         <option value="all">cards + rules</option>
       </select>
       <input id="search-hero" type="text" placeholder="hero pool (optional)" size="16">
+      <select id="search-sort" title="sort cards by">
+        <option value="relevance" selected>sort: relevance</option>
+        <option value="name">name A–Z</option>
+        <option value="pitch">pitch ↑</option>
+        <option value="cost">cost ↑</option>
+        <option value="power">power ↓</option>
+        <option value="defense">defense ↓</option>
+      </select>
       <select id="search-k" title="results per page">
         <option>24</option><option selected>48</option><option>96</option>
       </select>
@@ -34,9 +42,7 @@
     <div id="search-status" class="status"></div>
     <div id="search-rules" class="rule-list"></div>
     <div id="search-grid" class="card-grid"></div>
-    <div class="more-row">
-      <button id="search-more" class="hidden">Load more</button>
-    </div>
+    <div id="search-pager" class="pager"></div>
   </main>
 
   <!-- ============ ASK ============ -->

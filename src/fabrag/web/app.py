@@ -87,16 +87,39 @@ def _hero_predicate(hero_name: str | None, fmt: str):
 # =============================================================================
 # Routes
 # =============================================================================
-# Paging cap: ranking is a single matrix op over ~4.9k docs, so deep pages
-# cost almost nothing server-side — the cap just bounds response size.
+# Result-set cap: ranking is a single matrix op over ~4.9k docs, so a deep
+# result set costs almost nothing server-side — the cap bounds memory/JSON.
 _MAX_DEPTH = 500
+
+# Sort options for the card list. Each maps to (key, descending). None values
+# (a card with no cost, say) always sort to the end regardless of direction.
+_SORTS = {
+    "name": (lambda c: c.name.lower(), False),
+    "pitch": (lambda c: c.pitch, False),
+    "cost": (lambda c: c.cost, False),
+    "power": (lambda c: c.power, True),
+    "defense": (lambda c: c.defense, True),
+}
+
+
+def _sorted_cards(results: list[SearchResult], sort: str) -> list[SearchResult]:
+    key, desc = _SORTS[sort]
+
+    def sort_key(r: SearchResult):
+        v = key(r.doc)
+        if v is None:
+            return (1, 0)
+        return (0, -v if (desc and not isinstance(v, str)) else v)
+
+    return sorted(results, key=sort_key)
 
 
 @app.get("/api/search")
 def api_search(
     q: str,
-    k: int = 12,
-    offset: int = 0,
+    k: int = 24,
+    page: int = 1,
+    sort: str = "relevance",
     source: str = "cards",
     color: str | None = None,
     pitch: int | None = None,
@@ -104,13 +127,18 @@ def api_search(
     legal: str | None = None,
     hero: str | None = None,
 ):
-    """Ranked search with offset paging.
+    """Ranked search with numbered pages and optional card sorting.
 
-    The retriever has no native offset — it returns top-k. Paging is a slice
-    of a deeper top-(offset+k), which re-ranks on every page request. That's
-    deliberate simplicity: re-scoring the whole corpus is sub-millisecond, so
-    caching page state server-side would be machinery without a payoff.
+    Shape: the CARD list is the pageable/sortable thing (sort over the FULL
+    capped result set, then slice — page 1 of "cost ascending" really is the
+    cheapest matches overall). Rule hits don't sort by power, so they come
+    back as a separate relevance-ordered list: paged when source=rules,
+    pinned top-few when source=all. Re-ranking per request is fine — scoring
+    the whole corpus is sub-millisecond; page-state caching would be
+    machinery without a payoff.
     """
+    if sort != "relevance" and sort not in _SORTS:
+        raise HTTPException(status_code=400, detail=f"unknown sort {sort!r}")
     filters = CardFilter(
         color=color,
         pitch=pitch,
@@ -122,18 +150,31 @@ def api_search(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
-    offset = max(0, offset)
-    depth = min(offset + k, _MAX_DEPTH)
-    results = rag.retrieve(
-        q, k=depth, source=source, filters=filters, predicate=predicate
-    )
-    page = results[offset : offset + k]
-    # More may exist if we filled the requested depth and haven't hit the cap.
-    has_more = len(results) == depth and depth < _MAX_DEPTH
+    page = max(1, page)
+    lo, hi = (page - 1) * k, page * k
+
+    def fetch(src: str, depth: int) -> list[SearchResult]:
+        return rag.retrieve(q, k=depth, source=src, filters=filters, predicate=predicate)
+
+    cards: list[SearchResult] = []
+    rules: list[SearchResult] = []
+    if source in ("cards", "all"):
+        cards = fetch("cards", _MAX_DEPTH)
+        if sort != "relevance":
+            cards = _sorted_cards(cards, sort)
+    if source == "all":
+        rules = fetch("rules", 4)  # pinned context, not the main list
+    elif source == "rules":
+        rules = fetch("rules", _MAX_DEPTH)
+
+    paged = cards if source != "rules" else rules
+    total = len(paged)
     return {
-        "results": [_result_json(r) for r in page],
-        "offset": offset,
-        "has_more": has_more,
+        "cards": [_result_json(r) for r in (cards[lo:hi] if source != "rules" else [])],
+        "rules": [_result_json(r) for r in (rules[lo:hi] if source == "rules" else rules)],
+        "total": total,
+        "page": page,
+        "pages": max(1, -(-total // k)),  # ceil
     }
 
 
