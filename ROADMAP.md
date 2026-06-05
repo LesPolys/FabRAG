@@ -120,14 +120,34 @@ Living Legend, Silver Age, UPF), stored losslessly.
   poor (hero name in every query); deck *quality* has no eval yet — only
   legality is measured.
 
-## ⬜ Phase 7 — Card-display UI *(capstone demo)*
-*Goal: surface RAG results visually; a shareable artifact.*
+## ✅ Phase 7 — Card-display UI *(capstone demo)*
+*RAG results, visually — `fabrag serve` → http://127.0.0.1:8000.*
 
-1. **Stack choice** *(decision)*: fast win (Streamlit/Gradio) vs. learn-internals
-   (FastAPI + minimal JS).
-2. Search view (card grid with images via `image_url`), Ask view (answer + cited
-   card images), Deck view (generated list rendered by pitch/type).
-3. Thin layer over existing `rag`/`deck` modules — no logic duplication.
+- **Stack** *(decision)*: FastAPI + framework-free JS/CSS — chosen for card
+  display quality (true 450:628 aspect grid, hover-zoom, lightbox, lazy
+  loading, `played_horizontally` cards rotated in their cells) and the
+  learn-web-internals path.
+- **Thin-skin rule held**: every route is parse → call-what-the-CLI-calls →
+  serialize; no logic in the web layer. Two front doors, one engine.
+- **Search view**: numbered pages over the full (500-cap) result set with
+  server-side sorting (name/pitch/cost/power/defense; None-stats last) —
+  sort-then-page, so page 1 of "cost ↑" is the cheapest matches overall.
+  Rule hits render as citation chips with CR deep links.
+- **Ask view**: SSE streaming (grounding event renders citations before the
+  first token arrives, mirroring the CLI's results-then-stream shape).
+- **Build view**: deck grouped loadout/pitch-1/2/3 with color accents and
+  copy badges; finisher notes + quality warnings disclosed; game plan below.
+
+---
+
+## Project status: all seven phases complete
+
+The headline commands: `fabrag search` · `fabrag ask` · `fabrag build` ·
+`fabrag eval` · `fabrag serve`. Open threads worth a future session, in
+rough value order: grow the gold set (22 → 40) and add a deck-QUALITY eval;
+sweep chunk size / quota split with `fabrag eval`; loadout slot limits +
+Blitz exact-40 in deck.py; co-occurrence-structure queries (a reranker stage
+would be the natural experiment); strategy-query diversity in build.py.
 
 ---
 
