@@ -38,6 +38,15 @@ _DEFAULT_MIN_DECK_SIZE = 60
 
 MAX_COPIES = 3  # max copies of a card (by name) in constructed formats
 
+# CR 1.3.2 splits cards into hero-, token-, deck-, and arena-cards; only
+# deck-cards may start in a deck. These type keywords mark the non-deck kinds
+# present in the data (each has ZERO cards with a pitch value — the deck-card
+# hallmark). Found the hard way: Phase 6's generator legally "drafted" the
+# Quicken token before this exclusion existed. Figments, Constructs,
+# Invocations and Afflictions DO pitch and stay deckable (e.g. Dromai's
+# Invocations are real main-deck cards).
+NON_DECK_TYPES: frozenset[str] = frozenset({"Token", "Macro", "Landmark", "Demi-Hero"})
+
 # Mirror Legality's format aliases so callers can say "Classic Constructed".
 _FORMAT_ALIASES: dict[str, str] = {
     "classic_constructed": "cc", "classic": "cc",
@@ -79,6 +88,9 @@ def ineligibility_reasons(card: Card, hero: Card, fmt: str = "cc") -> list[str]:
         raise ValueError(f"{hero.name!r} is not a hero card.")
 
     reasons: list[str] = []
+    non_deck = NON_DECK_TYPES.intersection(card.types)
+    if non_deck:
+        reasons.append(f"{sorted(non_deck)} cards can't start in a deck (CR 1.3.2)")
     if not card.legality.is_legal(fmt):
         reasons.append(f"not legal in {_norm_fmt(fmt)}")
 
@@ -105,8 +117,8 @@ def hero_pool_predicate(hero: Card, fmt: str = "cc") -> Callable[[Card], bool]:
     hero_talents = set(hero.talents)
 
     def keep(card: Card) -> bool:
-        if card.is_hero:
-            return False  # heroes aren't deck cards
+        if card.is_hero or NON_DECK_TYPES.intersection(card.types):
+            return False  # heroes/tokens/etc. can't start in a deck
         return (
             card.legality.is_legal(fmt)
             and set(card.classes) <= hero_classes
