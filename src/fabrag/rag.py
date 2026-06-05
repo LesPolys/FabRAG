@@ -22,7 +22,7 @@ from dataclasses import dataclass
 
 from .cards import Card, expand_symbols
 from .generation import generate, generate_stream
-from .retrieval import CardFilter, Retriever, SearchResult
+from .retrieval import CardFilter, Retriever, SearchResult, card_retriever, scope
 
 # A retrieval result with no cards needs no LLM call — we answer directly.
 _NO_MATCH_MSG = (
@@ -75,7 +75,7 @@ def _format_card(card) -> str:
 def format_context(results: list[SearchResult]) -> str:
     """Render retrieved cards into the numbered CARDS block the LLM sees."""
     return "\n\n".join(
-        f"[{i}] {_format_card(r.card)}" for i, r in enumerate(results, start=1)
+        f"[{i}] {_format_card(r.doc)}" for i, r in enumerate(results, start=1)
     )
 
 
@@ -90,7 +90,7 @@ def get_retriever() -> Retriever:
     """
     global _default_retriever
     if _default_retriever is None:
-        _default_retriever = Retriever.load_or_build()
+        _default_retriever = card_retriever()
     return _default_retriever
 
 
@@ -102,7 +102,9 @@ def _retrieve(
     retriever: Retriever | None,
 ) -> tuple[list[SearchResult], str]:
     retriever = retriever if retriever is not None else get_retriever()
-    results = retriever.search(question, k=k, filters=filters, predicate=predicate)
+    results = retriever.search(
+        question, k=k, predicate=scope(filters=filters, card_predicate=predicate)
+    )
     return results, format_context(results)
 
 

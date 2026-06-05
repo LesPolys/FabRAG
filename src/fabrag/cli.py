@@ -20,9 +20,10 @@ import argparse
 import sys
 
 from . import rag
+from .cards import Card
 from .deck import find_hero, hero_pool_predicate
 from .rag import answer_stream
-from .retrieval import CardFilter, SearchResult
+from .retrieval import CardFilter, SearchResult, scope
 
 
 # --- filters: shared across both subcommands ---------------------------------
@@ -80,8 +81,8 @@ def _stat_line(card) -> str:
 
 def _print_results(results: list[SearchResult]) -> None:
     for i, r in enumerate(results, start=1):
-        print(f"{i:>2}. [{r.score:.3f}] {r.card.name} — {r.card.type_text}"
-              f"{_stat_line(r.card)}")
+        print(f"{i:>2}. [{r.score:.3f}] {r.doc.name} — {r.doc.type_text}"
+              f"{_stat_line(r.doc)}")
 
 
 # --- hero pool ---------------------------------------------------------------
@@ -93,7 +94,9 @@ def _resolve_hero_predicate(args: argparse.Namespace):
     """
     if not args.hero:
         return None, None
-    hero = find_hero(args.hero, rag.get_retriever().cards)
+    # The shared corpus may mix Cards and RuleChunks; heroes live in the cards.
+    cards = [d for d in rag.get_retriever().docs if isinstance(d, Card)]
+    hero = find_hero(args.hero, cards)
     fmt = args.legal_in or "cc"
     talents = ", ".join(hero.talents) or "none"
     banner = (f"Hero: {hero.name} — {'/'.join(hero.classes) or 'classless'} "
@@ -112,7 +115,7 @@ def _cmd_search(args: argparse.Namespace) -> int:
     if banner:
         print(banner)
     results = rag.get_retriever().search(
-        args.query, k=args.k, filters=filters, predicate=predicate
+        args.query, k=args.k, predicate=scope(filters=filters, card_predicate=predicate)
     )
     if not results:
         print("No cards matched your query and filters.")

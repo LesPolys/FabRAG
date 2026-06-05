@@ -91,6 +91,11 @@ class RuleChunk(BaseModel):
     source_url: str | None = None                  # deep link to the first rule's anchor
 
     @property
+    def doc_id(self) -> str:
+        """Stable id under the retrieval Document protocol (see retrieval.py)."""
+        return self.chunk_id
+
+    @property
     def citation(self) -> str:
         """How an answer should refer to this chunk, e.g. 'CR 7.0.3'."""
         if self.kind == "keyword":
