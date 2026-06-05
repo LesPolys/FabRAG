@@ -140,14 +140,54 @@ Living Legend, Silver Age, UPF), stored losslessly.
 
 ---
 
-## Project status: all seven phases complete
+*Phases 0–7 (the original plan) are complete: `fabrag search` · `ask` ·
+`build` · `eval` · `serve`. Phases 8–10 extend the deck-building flow into a
+real product surface.*
 
-The headline commands: `fabrag search` · `fabrag ask` · `fabrag build` ·
-`fabrag eval` · `fabrag serve`. Open threads worth a future session, in
-rough value order: grow the gold set (22 → 40) and add a deck-QUALITY eval;
-sweep chunk size / quota split with `fabrag eval`; loadout slot limits +
-Blitz exact-40 in deck.py; co-occurrence-structure queries (a reranker stage
-would be the natural experiment); strategy-query diversity in build.py.
+## 🔜 Phase 8 — Eval deepening & retrieval tuning
+*Goal: turn the knobs Phase 5 built the dial for.*
+
+1. **Grow the gold set** 22 → 40+: more hard card cases (co-occurrence
+   structure, multi-constraint), authored by exact-text/CR lookup as before.
+2. **Sweep chunk size** (`target_chars`/`max_chars`) and the **card/rule
+   quota split** with `fabrag eval`; record the curves, lock in the winners.
+3. *(Stretch)* a **reranker stage** experiment — the natural attack on the
+   co-occurrence queries that defeat both scorers.
+
+## ⬜ Phase 9 — Card-pool registration & sideboarding
+*Goal: model deck registration the way the game actually works. Per the
+official TRP (rules.fabtcg.com/en/trp/07-constructed-formats/):*
+*CC: 1 adult hero + max 80 cards, ≤3 copies each, ≥60-card starting deck.
+Blitz: 1 young hero + max 52 cards, ≤1 copy per unique card, exactly-40
+starting deck.*
+
+1. **`CardPool` model**: hero + inventory (weapons + 1 head/chest/arms/legs)
+   + starting deck + sideboard (the registered pool beyond the deck).
+   Fixes two latent deck.py bugs found while reading the TRP: Blitz's
+   1-copy/exactly-40 rules and hero-age legality were unmodeled.
+2. **Validation upgrade**: per-format copy limits, pool caps, hero age,
+   equipment slot limits.
+3. **`build.py` generates full registrations**: main deck + inventory +
+   sideboard suggestions (matchup swaps), repair loop over the richer
+   validator.
+4. **Render the registration properly** (CLI + web): playable deck vs
+   inventory vs sideboard as distinct sections.
+
+## ⬜ Phase 10 — Deck workspace *(chat + stats)*
+*Goal: from "generate a deck" to "work on a deck".*
+
+1. **Deck stats panel**: pitch distribution, cost curve, card-type breakdown
+   (API + web UI).
+2. **Hero card displayed** in the deck view, with the registration sections
+   from Phase 9.
+3. **Deck chat**: a conversational agent grounded in the current pool +
+   rules corpus — discuss the deck, ask "why this card", request swap
+   suggestions; the agent can search the hero pool and cite rules. Extends
+   Phase 6's agentic loop with multi-turn state.
+
+### Carryover parking lot
+Strategy-query diversity in build.py; deck-QUALITY eval (legality is
+measured, goodness isn't) — natural companion to Phase 10's stats.
 
 ---
 
