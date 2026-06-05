@@ -95,16 +95,30 @@ Living Legend, Silver Age, UPF), stored losslessly.
   known-hard case: co-occurrence-structure queries ("destroy equipment on
   hit") defeat both scorers.
 
-## 🔜 Phase 6 — Deck generation *(the headline)*
-*Goal: constraint-guided generation / a lightweight agentic loop.*
+## ✅ Phase 6 — Deck generation *(the headline)*
+*Constraint-guided generation: the generator + verifier + feedback loop.*
 
-1. **Input**: hero + optional strategy/archetype + format.
-2. **Candidate sourcing**: hero-pool retrieval driven by strategy-derived queries.
-3. **Assembly + repair loop**: LLM proposes a list → `validate_deck()` checks →
-   errors fed back → re-propose until legal. *The core agentic lesson.*
-4. **Curve/ratio heuristics**: pitch balance, copy counts, loadout slots.
-5. **Explanation**: grounded rationale. → `fabrag build --hero X --strategy
-   "aggro arcane"` yields a guaranteed-legal decklist + why.
+- **Pipeline** (`build.py`): strategy —LLM→ 4-6 retrieval queries —hybrid
+  search over the hero-legal pool→ quoted candidate sheet —LLM→ JSON
+  decklist → resolve + `validate_deck()` → errors fed back → re-propose
+  (≤4 rounds) → **deterministic finisher** (drop/clamp/pad, every repair
+  disclosed) makes "guaranteed legal" honest. Legality hard, grounding soft
+  (off-sheet-but-legal picks warn, don't fail).
+- **Heuristics**: pitch-balance targets guide the finisher's padding and
+  produce quality warnings (oversize main deck, off-target pitch ratios).
+- **`fabrag build --hero X --strategy "..." --format blitz`**: decklist
+  grouped loadout-then-pitch + a game-plan explanation grounded in the
+  decklist itself (reuses the fabrag-ask anti-hallucination contract).
+- **Bugs the loop surfaced**: deck.py admitted Token/Macro/Landmark/
+  Demi-Hero cards (the generator "drafted" the Quicken token — CR 1.3.2
+  taxonomy now enforced); "best attempt = fewest errors" preferred an empty
+  deck (1 error) over a fixable 78-card one (badness now counts deficit).
+- **Observed**: legal in 2-4 LLM rounds; 7B round-to-round variance is large
+  (68→154 cards), which is the finisher's reason to exist.
+- **Carried forward**: equipment/loadout slot limits + Blitz exact-40 still
+  unmodeled (deck.py known simplifications); strategy-query diversity is
+  poor (hero name in every query); deck *quality* has no eval yet — only
+  legality is measured.
 
 ## ⬜ Phase 7 — Card-display UI *(capstone demo)*
 *Goal: surface RAG results visually; a shareable artifact.*
