@@ -22,10 +22,11 @@
   },
   {
     "id": "card-command-and-conquer",
-    "query": "generic attack that destroys the cards in my opponent's arsenal when it hits",
+    "query": "attack that destroys the cards in my opponent's arsenal when it hits",
     "kind": "card",
-    "expected": ["Command and Conquer"],
-    "notes": "Iconic single: 'When this hits a hero, destroy all cards in their arsenal.'"
+    "expected": ["Command and Conquer", "Seek and Destroy"],
+    "match": "any",
+    "notes": "C&C is the iconic 'When this hits a hero, destroy all cards in their arsenal'; Seek and Destroy grants the same effect to an arrow attack. Either answers the need."
   },
   {
     "id": "card-hit-draw",
