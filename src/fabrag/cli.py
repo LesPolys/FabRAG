@@ -115,6 +115,62 @@ def _resolve_hero_predicate(args: argparse.Namespace):
 
 
 # --- subcommands -------------------------------------------------------------
+_PITCH_LABEL = {1: "Pitch 1 (red)", 2: "Pitch 2 (yellow)", 3: "Pitch 3 (blue)"}
+
+
+def _cmd_build(args: argparse.Namespace) -> int:
+    """fabrag build: hero + strategy -> a guaranteed-legal decklist + rationale."""
+    from collections import Counter
+
+    from .build import build_deck, explain_deck_stream
+
+    try:
+        result = build_deck(args.hero, args.strategy, args.format)
+    except ValueError as e:  # bad hero name / ambiguous match
+        print(e, file=sys.stderr)
+        return 1
+
+    deck = result.deck
+    print(f"Hero:     {deck.hero.name} ({deck.hero.type_text})")
+    print(f"Format:   {deck.format}   |   strategy: {args.strategy}")
+    print(f"Sourcing: {', '.join(result.queries)}")
+    print(f"Rounds:   {result.rounds}"
+          + (f"   |   finisher: {'; '.join(result.finisher_notes)}" if result.finisher_notes else ""))
+    print(f"Legal:    {result.validation.ok}")
+
+    # Decklist grouped: loadout first, then main deck by pitch.
+    groups: dict[str, list[tuple[int, str]]] = {}
+    counts = Counter((c.name, c.pitch) for c in deck.cards)
+    by_key = {(c.name, c.pitch): c for c in deck.cards}
+    for (name, pitch), n in sorted(counts.items()):
+        c = by_key[(name, pitch)]
+        if c.is_equipment or c.is_weapon:
+            label = "Loadout (equipment & weapons)"
+        else:
+            label = _PITCH_LABEL.get(pitch, "Other")
+        groups.setdefault(label, []).append((n, f"{name} — {c.type_text}"))
+    order = ["Loadout (equipment & weapons)", "Pitch 1 (red)", "Pitch 2 (yellow)",
+             "Pitch 3 (blue)", "Other"]
+    main_n = sum(n for (name, p), n in counts.items()
+                 if not (by_key[(name, p)].is_equipment or by_key[(name, p)].is_weapon))
+    print(f"\nDecklist ({main_n} main-deck cards):")
+    for label in order:
+        if label in groups:
+            print(f"  {label}:")
+            for n, line in groups[label]:
+                print(f"    {n}x {line}")
+
+    for w in result.warnings:
+        print(f"\n  note: {w}")
+
+    if not args.no_explain:
+        print("\nGame plan:")
+        for piece in explain_deck_stream(result, args.strategy):
+            print(piece, end="", flush=True)
+        print()
+    return 0
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     """Run the gold-set retrieval eval (and optionally the grounding eval).
 
@@ -197,6 +253,17 @@ def main(argv: list[str] | None = None) -> int:
     p_ask = sub.add_parser("ask", help="ask a question, get a grounded answer")
     _add_filter_args(p_ask)
     p_ask.set_defaults(func=_cmd_ask)
+
+    p_build = sub.add_parser("build", help="generate a legal deck for a hero + strategy")
+    p_build.add_argument("--hero", required=True, metavar="NAME",
+                         help="hero to build for (partial names ok if unambiguous)")
+    p_build.add_argument("--strategy", default="a balanced, efficient deck",
+                         help="deck strategy/archetype in plain words")
+    p_build.add_argument("--format", default="cc", dest="format",
+                         help="format: cc / blitz / commoner (default: cc)")
+    p_build.add_argument("--no-explain", action="store_true",
+                         help="skip the LLM game-plan explanation")
+    p_build.set_defaults(func=_cmd_build)
 
     p_eval = sub.add_parser("eval", help="run the gold-set evaluation suite")
     p_eval.add_argument("-k", "--top-k", type=int, default=8, dest="k",

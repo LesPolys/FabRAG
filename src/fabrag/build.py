@@ -513,6 +513,42 @@ def build_deck(
     )
 
 
+# =============================================================================
+# Explanation — the deck, justified from itself
+# =============================================================================
+def deck_context(result: BuildResult) -> str:
+    """The decklist rendered as grounding context for the explanation call.
+
+    We reuse generation.py's grounded-answer machinery: the decklist IS the
+    context, so the rationale can only talk about cards actually in the deck —
+    the same anti-hallucination contract as fabrag ask, pointed at our own
+    output."""
+    from collections import Counter
+
+    groups: Counter[tuple[str, int | None]] = Counter(
+        (c.name, c.pitch) for c in result.deck.cards
+    )
+    by_key = {(c.name, c.pitch): c for c in result.deck.cards}
+    lines = []
+    for (name, pitch), n in sorted(groups.items()):
+        c = by_key[(name, pitch)]
+        lines.append(f"{n}x {_card_line(c)}")
+    return "\n".join(lines)
+
+
+def explain_deck_stream(result: BuildResult, strategy: str):
+    """Stream a short grounded rationale for the built deck."""
+    from .generation import generate_stream
+
+    question = (
+        f"This {result.deck.format} deck was built for {result.deck.hero.name} "
+        f"with the strategy: {strategy!r}. Explain the game plan in 2-3 short "
+        f"paragraphs: how the deck executes the strategy, which cards are the "
+        f"core engine, and what the pitch balance supports. Cite cards by name."
+    )
+    return generate_stream(question, deck_context(result))
+
+
 if __name__ == "__main__":
     # Self-check: build a Blitz deck (40 cards — kinder to a 7B counting cards)
     result = build_deck("Ira, Crimson Haze", "fast aggressive ninja attacks", "blitz")
