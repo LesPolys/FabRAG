@@ -98,36 +98,62 @@ function renderRuleHit(rule) {
   return div;
 }
 
-function renderResults(results, gridEl, rulesEl) {
-  gridEl.replaceChildren();
-  rulesEl.replaceChildren();
+function renderResults(results, gridEl, rulesEl, { append = false } = {}) {
+  if (!append) {
+    gridEl.replaceChildren();
+    rulesEl.replaceChildren();
+  }
   for (const r of results) {
     if (r.kind === "card") gridEl.appendChild(renderCardCell(r));
     else rulesEl.appendChild(renderRuleHit(r));
   }
 }
 
-/* ---------- search ---------- */
-$("search-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
+/* ---------- search (with Load-more paging) ----------
+ * Ranked results page by offset: each "Load more" fetches the next slice of
+ * the same ranking and APPENDS, so the grid grows in relevance order. */
+let searchOffset = 0;
+let searchShown = 0;
+
+async function runSearch({ append = false } = {}) {
+  const k = parseInt($("search-k").value, 10);
+  if (!append) { searchOffset = 0; searchShown = 0; }
   const params = new URLSearchParams({
     q: $("search-q").value,
     source: $("search-source").value,
-    k: $("search-k").value,
+    k: String(k),
+    offset: String(searchOffset),
   });
   const hero = $("search-hero").value.trim();
   if (hero) params.set("hero", hero);
-  $("search-status").textContent = "searching…";
+
+  const status = $("search-status");
+  const moreBtn = $("search-more");
+  status.textContent = append ? "" : "searching…";
+  moreBtn.disabled = true;
   try {
     const resp = await fetch("/api/search?" + params);
     if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
     const data = await resp.json();
-    $("search-status").textContent = data.results.length ? "" : "nothing matched";
-    renderResults(data.results, $("search-grid"), $("search-rules"));
+    renderResults(data.results, $("search-grid"), $("search-rules"), { append });
+    searchShown += data.results.length;
+    searchOffset += k;
+    status.textContent = searchShown
+      ? `showing top ${searchShown}` + (data.has_more ? "" : " — end of results")
+      : "nothing matched";
+    moreBtn.classList.toggle("hidden", !data.has_more);
   } catch (err) {
-    $("search-status").textContent = "error: " + err.message;
+    status.textContent = "error: " + err.message;
+  } finally {
+    moreBtn.disabled = false;
   }
+}
+
+$("search-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  runSearch();
 });
+$("search-more").addEventListener("click", () => runSearch({ append: true }));
 
 /* ---------- ask (SSE streaming) ---------- */
 let askSource = null;

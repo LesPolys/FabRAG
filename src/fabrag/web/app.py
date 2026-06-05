@@ -87,10 +87,16 @@ def _hero_predicate(hero_name: str | None, fmt: str):
 # =============================================================================
 # Routes
 # =============================================================================
+# Paging cap: ranking is a single matrix op over ~4.9k docs, so deep pages
+# cost almost nothing server-side — the cap just bounds response size.
+_MAX_DEPTH = 500
+
+
 @app.get("/api/search")
 def api_search(
     q: str,
     k: int = 12,
+    offset: int = 0,
     source: str = "cards",
     color: str | None = None,
     pitch: int | None = None,
@@ -98,6 +104,13 @@ def api_search(
     legal: str | None = None,
     hero: str | None = None,
 ):
+    """Ranked search with offset paging.
+
+    The retriever has no native offset — it returns top-k. Paging is a slice
+    of a deeper top-(offset+k), which re-ranks on every page request. That's
+    deliberate simplicity: re-scoring the whole corpus is sub-millisecond, so
+    caching page state server-side would be machinery without a payoff.
+    """
     filters = CardFilter(
         color=color,
         pitch=pitch,
@@ -108,10 +121,20 @@ def api_search(
         predicate = _hero_predicate(hero, legal or "cc")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+    offset = max(0, offset)
+    depth = min(offset + k, _MAX_DEPTH)
     results = rag.retrieve(
-        q, k=k, source=source, filters=filters, predicate=predicate
+        q, k=depth, source=source, filters=filters, predicate=predicate
     )
-    return {"results": [_result_json(r) for r in results]}
+    page = results[offset : offset + k]
+    # More may exist if we filled the requested depth and haven't hit the cap.
+    has_more = len(results) == depth and depth < _MAX_DEPTH
+    return {
+        "results": [_result_json(r) for r in page],
+        "offset": offset,
+        "has_more": has_more,
+    }
 
 
 @app.get("/api/ask")

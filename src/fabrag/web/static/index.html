@@ -26,14 +26,17 @@
         <option value="all">cards + rules</option>
       </select>
       <input id="search-hero" type="text" placeholder="hero pool (optional)" size="16">
-      <select id="search-k">
-        <option>12</option><option selected>24</option><option>48</option>
+      <select id="search-k" title="results per page">
+        <option>24</option><option selected>48</option><option>96</option>
       </select>
       <button type="submit">Search</button>
     </form>
     <div id="search-status" class="status"></div>
     <div id="search-rules" class="rule-list"></div>
     <div id="search-grid" class="card-grid"></div>
+    <div class="more-row">
+      <button id="search-more" class="hidden">Load more</button>
+    </div>
   </main>
 
   <!-- ============ ASK ============ -->
