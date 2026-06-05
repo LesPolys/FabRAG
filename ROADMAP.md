@@ -68,18 +68,34 @@ Living Legend, Silver Age, UPF), stored losslessly.
   harness; observed one confabulated rule-number citation (true content,
   wrong attribution) — exactly what the grounding eval must catch.
 
-## 🔜 Phase 5 — Evaluation harness
-*Goal: measure RAG quality — retrieval metrics + answer grounding — before
-building the hardest component, so it guards against regressions.*
+## ✅ Phase 5 — Evaluation harness *(and the retrieval overhaul it forced)*
+*Measure RAG quality before building on it — the measuring immediately paid off.*
 
-1. Hand-author a **gold set** (~20–40 cases: query → expected card/rule).
-2. **Retrieval metrics**: recall@k, MRR/nDCG.
-3. **Grounding eval**: does the answer cite only retrieved cards? (heuristic +
-   local-LLM-as-judge).
-4. `fabrag eval` → a report with baseline numbers; use it to tune k, chunk size,
-   prefixes.
+- **Gold set** (`data/gold/gold_set.json`, 22 cases): ground truth from exact
+  text search / CR lookup, never semantic search; expectations bind to stable
+  identities (card names, CR rule numbers) so re-chunking can't invalidate
+  them; `match: all|any` distinguishes "all relevant" from "alternatives".
+- **Retrieval metrics** (`evaluation.py`): recall@k, MRR, nDCG@k; two lenses
+  (`all` = production pipeline w/ quotas, `per-kind` = clean ranking quality).
+- **The headline finding**: demos lied. Baseline cards recall@8 was **0.042**
+  (dense nomic) — hub cards + weak discrimination on compositional queries —
+  while rules retrieval was already perfect (1.000/0.964 MRR).
+- **Eval-driven fixes, measured**: hand-rolled BM25 (`lexical.py`) + RRF
+  fusion in the Retriever (`mode=hybrid|dense|lexical`), and an embedding
+  model registry — `mxbai-embed-large` replaced nomic as default.
+  **Cards recall@8: 0.042 → 0.625; overall: 0.652 → 0.864.** Pure BM25 still
+  edges card recall (0.750) but loses MRR, rules, and paraphrase ability.
+- **Grounding eval** (`grounding.py`): deterministic citation audit (every
+  cited rule number/card must exist in the retrieved context) + qwen judge.
+  First run caught a confabulated "CR 8.5.10" that the LLM judge graded
+  "supported" — the layering argument in one example.
+- **`fabrag eval`**: the whole suite behind one command.
+- **Carried forward**: gold set should keep growing (22 → 40, esp. hard card
+  cases); chunk-size and quota-split tuning now measurable but not yet swept;
+  known-hard case: co-occurrence-structure queries ("destroy equipment on
+  hit") defeat both scorers.
 
-## ⬜ Phase 6 — Deck generation *(the headline)*
+## 🔜 Phase 6 — Deck generation *(the headline)*
 *Goal: constraint-guided generation / a lightweight agentic loop.*
 
 1. **Input**: hero + optional strategy/archetype + format.

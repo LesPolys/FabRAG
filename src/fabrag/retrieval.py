@@ -44,14 +44,24 @@ import numpy as np
 
 from .cards import Card, load_cards
 from .embeddings import EMBED_DIM, EMBED_MODEL, embed_documents, embed_query
+from .lexical import BM25Index
 from .rules import RuleChunk, load_all_chunks
 
-# Per-source indexes under data/index/, resolved relative to this file.
+# Per-source, per-model indexes under data/index/, resolved relative to this
+# file. The model name is part of the path so A/B-ing embedding models keeps
+# both caches warm instead of re-embedding on every switch (the fingerprint
+# would catch the mismatch, but catching it means a full rebuild).
 _INDEX_DIR = Path(__file__).resolve().parents[2] / "data" / "index"
-CARD_INDEX_PATH = _INDEX_DIR / "card_index.npz"
-RULES_INDEX_PATH = _INDEX_DIR / "rules_index.npz"
+CARD_INDEX_PATH = _INDEX_DIR / f"card_index-{EMBED_MODEL}.npz"
+RULES_INDEX_PATH = _INDEX_DIR / f"rules_index-{EMBED_MODEL}.npz"
 
 Source = Literal["cards", "rules", "all"]
+Mode = Literal["hybrid", "dense", "lexical"]
+
+# RRF dampening constant. 60 is the value from the original paper (Cormack et
+# al. 2009) and is remarkably insensitive in practice: big enough that rank 1
+# vs rank 3 doesn't dominate, small enough that top ranks still matter most.
+RRF_C = 60
 
 
 # =============================================================================
@@ -200,6 +210,14 @@ class Retriever:
             )
         self.docs = list(docs)
         self.vectors = vectors  # (n, EMBED_DIM), float32, unit-normalized
+        self._bm25: BM25Index | None = None  # built lazily; cheap, not persisted
+
+    @property
+    def bm25(self) -> BM25Index:
+        """The lexical index over the SAME text the dense side embedded."""
+        if self._bm25 is None:
+            self._bm25 = BM25Index([d.text_for_embedding for d in self.docs])
+        return self._bm25
 
     # ---- search --------------------------------------------------------------
     def search(
@@ -207,12 +225,28 @@ class Retriever:
         query: str,
         k: int = 10,
         predicate: Callable[[Document], bool] | None = None,
+        mode: Mode = "hybrid",
     ) -> list[SearchResult]:
-        """Hybrid search: filter the corpus, then rank survivors by meaning.
+        """Filter the corpus, then rank survivors — by meaning, by terms, or both.
 
         `predicate` is the single structured-filtering hook — build one with
         scope() to combine source selection, CardFilters, and deck-legality
-        tests. Returns up to `k` results, most relevant first.
+        tests. `mode` picks the ranker:
+
+          "dense"   cosine similarity over embeddings — knows what text MEANS,
+                    weak at insisting on exact constraints. score = cosine.
+          "lexical" BM25 over the same text — insists on exact terms, blind to
+                    synonyms and paraphrase. score = BM25.
+          "hybrid"  reciprocal rank fusion of both rankings:
+                        rrf(d) = Σ 1/(C + rank_of_d_in_each_ranking)
+                    Fusing RANKS rather than scores sidesteps the very problem
+                    the eval measured: raw scores from different scorers (and
+                    even from different corpora) aren't comparable, but "what
+                    position did each scorer put this document at?" always is.
+                    score = RRF value (~0.03 max — a different scale; compare
+                    within a result list, not across modes).
+
+        Returns up to `k` results, most relevant first.
         """
         # 1. STRUCTURED: which corpus rows survive the hard constraints?
         if predicate is None:
@@ -224,9 +258,15 @@ class Retriever:
         if rows.size == 0:
             return []  # nothing matched the filter — nothing to rank
 
-        # 2. SEMANTIC: cosine similarity == dot product (vectors are normalized).
-        q = embed_query(query)                  # (EMBED_DIM,)
-        scores = self.vectors[rows] @ q         # (len(rows),)
+        # 2. Rank the survivors under the chosen mode.
+        if mode == "dense":
+            scores = self.vectors[rows] @ embed_query(query)
+        elif mode == "lexical":
+            scores = self.bm25.scores(query)[rows]
+        else:  # hybrid: fuse the two rankings, not the two score scales
+            dense = self.vectors[rows] @ embed_query(query)
+            lexical = self.bm25.scores(query)[rows]
+            scores = 1.0 / (RRF_C + _ranks(dense)) + 1.0 / (RRF_C + _ranks(lexical))
 
         # 3. Top-k: argpartition finds the k best in O(n) without a full sort,
         #    then we sort just those k descending.
@@ -286,6 +326,14 @@ class Retriever:
         docs = [d for p in parts for d in p.docs]
         vectors = np.vstack([p.vectors for p in parts])
         return cls(docs, vectors)
+
+
+def _ranks(scores: np.ndarray) -> np.ndarray:
+    """1-based rank of every element under a descending sort (rank 1 = best)."""
+    order = np.argsort(-scores)
+    ranks = np.empty(len(order), dtype=np.float32)
+    ranks[order] = np.arange(1, len(order) + 1, dtype=np.float32)
+    return ranks
 
 
 def _fingerprint(docs: Sequence[Document]) -> str:

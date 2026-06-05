@@ -15,15 +15,37 @@ Two things this module gets right, both learned the hard way in Phase 0:
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import ollama
 
-EMBED_MODEL = "nomic-embed-text"
-EMBED_DIM = 768  # nomic-embed-text output dimensionality
+# Each embedding model is trained with its OWN task-prefix convention — using
+# the wrong one (or none) quietly degrades retrieval, which is exactly the
+# kind of failure only the eval harness would catch. The registry keeps
+# (dimensionality, doc prefix, query prefix) next to the model name so a swap
+# can't mix conventions.
+_MODELS: dict[str, tuple[int, str, str]] = {
+    # nomic: symmetric task prefixes on both sides.
+    "nomic-embed-text": (768, "search_document: ", "search_query: "),
+    # mxbai: instruction on the QUERY side only; documents are embedded bare.
+    "mxbai-embed-large": (
+        1024,
+        "",
+        "Represent this sentence for searching relevant passages: ",
+    ),
+}
 
-# Prefixes the model was trained with (see memory: nomic-embed-prefixes).
-_DOC_PREFIX = "search_document: "
-_QUERY_PREFIX = "search_query: "
+# An env var rather than a function parameter: the model choice must be ONE
+# global fact — retriever indexes, fingerprints, and query embedding all have
+# to agree, and threading a parameter through every layer invites a mismatch.
+#   FABRAG_EMBED_MODEL=nomic-embed-text uv run python -m fabrag.evaluation
+# Default is mxbai-embed-large: on the gold set it beats nomic-embed-text on
+# every metric (cards recall@8 0.292 vs 0.042 dense; 0.625 vs 0.458 hybrid).
+EMBED_MODEL = os.environ.get("FABRAG_EMBED_MODEL", "mxbai-embed-large")
+if EMBED_MODEL not in _MODELS:
+    raise ValueError(f"Unknown embed model {EMBED_MODEL!r}; known: {sorted(_MODELS)}")
+EMBED_DIM, _DOC_PREFIX, _QUERY_PREFIX = _MODELS[EMBED_MODEL]
 
 
 def _normalize(vecs: np.ndarray) -> np.ndarray:
