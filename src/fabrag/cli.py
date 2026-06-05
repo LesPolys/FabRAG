@@ -171,6 +171,15 @@ def _cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_serve(args: argparse.Namespace) -> int:
+    """fabrag serve: the web UI — a thin FastAPI skin over the same pipeline."""
+    import uvicorn
+
+    print(f"FabRAG web UI -> http://{args.host}:{args.port}")
+    uvicorn.run("fabrag.web.app:app", host=args.host, port=args.port, log_level="warning")
+    return 0
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     """Run the gold-set retrieval eval (and optionally the grounding eval).
 
@@ -264,6 +273,11 @@ def main(argv: list[str] | None = None) -> int:
     p_build.add_argument("--no-explain", action="store_true",
                          help="skip the LLM game-plan explanation")
     p_build.set_defaults(func=_cmd_build)
+
+    p_serve = sub.add_parser("serve", help="start the web UI")
+    p_serve.add_argument("--host", default="127.0.0.1")
+    p_serve.add_argument("--port", type=int, default=8000)
+    p_serve.set_defaults(func=_cmd_serve)
 
     p_eval = sub.add_parser("eval", help="run the gold-set evaluation suite")
     p_eval.add_argument("-k", "--top-k", type=int, default=8, dest="k",
