@@ -3,12 +3,15 @@
 Two ways in, sharing one set of structured filters:
 
   fabrag search "gain life when I attack" --class Wizard --legal cc -k 10
-      -> raw retrieval: the ranked cards, with similarity scores. Fast, no LLM.
-         Use it to see/trust what semantic search is actually finding.
+      -> raw retrieval: ranked cards and/or rules, with similarity scores.
+         Fast, no LLM. Use it to see/trust what semantic search is finding.
 
-  fabrag ask "which cards deal arcane damage to the hero?" --color Blue
+  fabrag ask "what happens when an attack is defended?" --source rules
       -> full RAG: retrieve, then a grounded natural-language answer streamed
-         live, followed by the cards it was grounded in.
+         live, followed by the cards/rules it was grounded in.
+
+Both take --source cards|rules|all (default all): cards come from card.json,
+rules from the chunked Comprehensive Rules + keyword glossary (rules.py).
 
 This is deliberately thin — all the real work lives in retrieval.py / rag.py.
 The CLI's only jobs are parsing flags into a CardFilter and printing nicely.
@@ -23,7 +26,7 @@ from . import rag
 from .cards import Card
 from .deck import find_hero, hero_pool_predicate
 from .rag import answer_stream
-from .retrieval import CardFilter, SearchResult, scope
+from .retrieval import CardFilter, SearchResult
 
 
 # --- filters: shared across both subcommands ---------------------------------
@@ -31,7 +34,9 @@ def _add_filter_args(p: argparse.ArgumentParser) -> None:
     """Attach the structured-filter flags (the metadata half of hybrid search)."""
     p.add_argument("query", help="natural-language query")
     p.add_argument("-k", "--top-k", type=int, default=8, dest="k",
-                   help="number of cards to retrieve (default: 8)")
+                   help="number of results to retrieve (default: 8)")
+    p.add_argument("--source", choices=("cards", "rules", "all"), default="all",
+                   help="which corpora to search (default: all)")
     p.add_argument("--color", help="pitch color: Red / Yellow / Blue")
     p.add_argument("--pitch", type=int, help="exact pitch value")
     p.add_argument("--cost", type=int, help="exact resource cost")
@@ -81,8 +86,13 @@ def _stat_line(card) -> str:
 
 def _print_results(results: list[SearchResult]) -> None:
     for i, r in enumerate(results, start=1):
-        print(f"{i:>2}. [{r.score:.3f}] {r.doc.name} — {r.doc.type_text}"
-              f"{_stat_line(r.doc)}")
+        d = r.doc
+        if isinstance(d, Card):
+            print(f"{i:>2}. [{r.score:.3f}] {d.name} — {d.type_text}{_stat_line(d)}")
+        else:  # RuleChunk — cite it, locate it, and link it for verification
+            where = f" — {d.section}" if d.kind == "rule" else ""
+            url = f"  <{d.source_url}>" if d.source_url else ""
+            print(f"{i:>2}. [{r.score:.3f}] {d.citation}{where}{url}")
 
 
 # --- hero pool ---------------------------------------------------------------
@@ -114,11 +124,11 @@ def _cmd_search(args: argparse.Namespace) -> int:
         return 1
     if banner:
         print(banner)
-    results = rag.get_retriever().search(
-        args.query, k=args.k, predicate=scope(filters=filters, card_predicate=predicate)
+    results = rag.retrieve(
+        args.query, k=args.k, source=args.source, filters=filters, predicate=predicate
     )
     if not results:
-        print("No cards matched your query and filters.")
+        print("Nothing matched your query and filters.")
         return 0
     _print_results(results)
     return 0
@@ -134,7 +144,7 @@ def _cmd_ask(args: argparse.Namespace) -> int:
     if banner:
         print(banner)
     results, stream = answer_stream(
-        args.query, k=args.k, filters=filters, predicate=predicate
+        args.query, k=args.k, source=args.source, filters=filters, predicate=predicate
     )
     for piece in stream:        # tokens arrive live
         print(piece, end="", flush=True)
