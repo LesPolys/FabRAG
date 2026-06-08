@@ -169,9 +169,11 @@ def _cmd_build(args: argparse.Namespace) -> int:
         for note in result.sideboard_notes:
             print(f"  {note}")
 
-    # 4. Stats — the deck's pitch / cost / type shape.
+    # 4. Stats + quality — the deck's shape, and a heuristic goodness scorecard.
+    from .deck_quality import render_quality, score_deck
     from .stats import deck_stats, render_stats
     print("\n" + render_stats(deck_stats(pool)))
+    print("\n" + render_quality(score_deck(pool)))
 
     for w in result.warnings:
         print(f"\n  note: {w}")
@@ -188,7 +190,7 @@ def _cmd_chat(args: argparse.Namespace) -> int:
     """fabrag chat: build a deck, then talk about it — grounded in the hero's
     legal pool + the rules corpus, streamed turn by turn."""
     from .build import build_deck
-    from .chat import deck_chat_stream, pool_to_text
+    from .chat import deck_chat_agentic, pool_to_text
 
     try:
         result = build_deck(args.hero, args.strategy, args.format)
@@ -209,7 +211,7 @@ def _cmd_chat(args: argparse.Namespace) -> int:
             break
         if not question:
             break
-        _results, stream = deck_chat_stream(pool.hero, pool.format, deck_text, history, question)
+        _results, stream = deck_chat_agentic(pool.hero, pool.format, deck_text, history, question)
         answer = ""
         for piece in stream:
             print(piece, end="", flush=True)

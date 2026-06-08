@@ -291,6 +291,18 @@ function renderStats(s) {
   return wrap;
 }
 
+/* Quality scorecard — each dimension a 0..100 bar; the note is the hover title. */
+function renderQuality(q) {
+  const rows = q.dimensions.map((d) => {
+    const row = statBar(d.name, Math.round(d.score * 100), 100, "quality");
+    row.title = d.note;
+    return row;
+  });
+  const block = statBlock(`Quality · ${q.overall.toFixed(2)} / 1.00`, rows);
+  block.classList.add("quality-block");
+  return block;
+}
+
 /* A titled card grid; `tag` optionally adds a per-card caption (slot, reason). */
 function buildSection(title, cls, cards, tag) {
   const section = document.createElement("section");
@@ -347,7 +359,9 @@ $("build-form").addEventListener("submit", async (e) => {
 
     const heroEl = $("build-hero-card");
     heroEl.replaceChildren(renderCardCell(d.hero));
-    $("build-stats").replaceChildren(renderStats(d.stats));
+    const statsEl = $("build-stats");
+    statsEl.replaceChildren(renderStats(d.stats));
+    if (d.quality) statsEl.appendChild(renderQuality(d.quality));
 
     const deckEl = $("build-deck");
     deckEl.replaceChildren();

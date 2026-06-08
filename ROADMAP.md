@@ -221,10 +221,25 @@ same way Phase 5's eval did: it exposed a shipped bug.*
 - Verified live: a Blitz build returns the full stats/registration JSON; a chat
   turn streamed 61 tokens of a coherent, deck-grounded answer.
 
+## ✅ Phase 11 — Carryover polish
+*The parking-lot items, cleared.*
+
+- **Strategy-query diversity** (`build.py`): `derive_queries` had a 7B stuff the
+  hero name into all 4-6 queries, collapsing them onto one vector. The prompt
+  now demands effect/role queries with no hero name, and a deterministic
+  `_diversify` backstop scrubs proper-nouns, trims stranded connectives, and
+  dedupes.
+- **Deck-quality scorecard** (`deck_quality.py`): scores a built deck on pitch
+  balance, curve health, role coverage, and (copy-limit formats) consistency —
+  an interpretable heuristic panel, not a learned metric. Shown in CLI build +
+  web stats panel.
+- **Tool-calling chat** (`chat.py`): `deck_chat_agentic` gives the model a search
+  tool and lets it decide when to use it, with a fallback to the always-retrieve
+  path. Verified: a card question searches; "thanks" doesn't.
+
 ### Carryover parking lot
-Strategy-query diversity in build.py (hero name dominates every query);
-deck-QUALITY eval (legality is measured, goodness isn't); a tool-calling chat
-where the model *decides* when to search (vs. always retrieving per turn).
+Empty — the original plan plus its carryovers are all shipped. Future ideas:
+deck import/export, matchup simulation, a learned deck-quality metric.
 
 ---
 
