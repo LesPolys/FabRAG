@@ -144,15 +144,29 @@ Living Legend, Silver Age, UPF), stored losslessly.
 `build` · `eval` · `serve`. Phases 8–10 extend the deck-building flow into a
 real product surface.*
 
-## 🔜 Phase 8 — Eval deepening & retrieval tuning
-*Goal: turn the knobs Phase 5 built the dial for.*
+## ✅ Phase 8 — Eval deepening & retrieval tuning
+*Turned the knobs Phase 5 built the dial for — one changed, one validated,
+one experiment concluded.*
 
-1. **Grow the gold set** 22 → 40+: more hard card cases (co-occurrence
-   structure, multi-constraint), authored by exact-text/CR lookup as before.
-2. **Sweep chunk size** (`target_chars`/`max_chars`) and the **card/rule
-   quota split** with `fabrag eval`; record the curves, lock in the winners.
-3. *(Stretch)* a **reranker stage** experiment — the natural attack on the
-   co-occurrence queries that defeat both scorers.
+- **Gold set 22 → 38** (specializations, multi-constraint, broad any-of
+  needs). Baseline at 38: overall 0.842 recall@8 / 0.723 MRR (per-kind).
+- **Chunk-size sweep** (`scripts/sweep_chunks.py`): recall saturates at 1.0
+  from 1000 chars; MRR/nDCG peak at the shipped **1500/3000 — the guess
+  survived measurement** and is now a choice. The sweep's own first version
+  evaluated a rules-only retriever and recommended 2200/4400; the merged-
+  corpus (production) numbers reversed that — BM25 statistics differ.
+  Measure the system, not a flattering simplification.
+- **Quota sweep** (`scripts/sweep_quota.py`): **RULES_SHARE 0.30 → 0.40** —
+  three rules slots at k=8 lift rules recall 0.850 → 0.950 and overall
+  0.737 → 0.781 for a 0.018 card cost; a fourth slot bought nothing.
+- **Reranker probe** (`scripts/probe_reranker.py`): an LLM judge rescues
+  in-window misses brilliantly (Glacial Horns #13 → #1) but the truly hard
+  cases sit at depth ~60-90+, where one-shot listwise judging fails (context
+  + 7B attention limits). Verdict: a pointwise reranker (1 call/candidate)
+  would work but is too slow for interactive local search — candidate-depth,
+  not ranking, is the hard cases' bottleneck. Recorded, not built.
+- Hygiene: explicit `num_ctx=8192` on generation calls (Ollama's default
+  truncates silently).
 
 ## ⬜ Phase 9 — Card-pool registration & sideboarding
 *Goal: model deck registration the way the game actually works. Per the
