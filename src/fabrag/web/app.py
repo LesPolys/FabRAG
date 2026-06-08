@@ -210,45 +210,67 @@ def api_build(req: BuildRequest):
     """Synchronous on purpose: a build is 1-3 minutes of LLM rounds, and a
     spinner with honest expectations beats premature job-queue machinery."""
     from ..build import build_deck, deck_context
+    from ..formats import get_format
 
     try:
         result = build_deck(req.hero, req.strategy, req.format)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
+    pool = result.pool
+
     explanation = ""
     if req.explain:
         from ..generation import generate
 
         question = (
-            f"This {result.deck.format} deck was built for {result.deck.hero.name} "
+            f"This {pool.format} deck was built for {pool.hero.name} "
             f"with the strategy: {req.strategy!r}. Explain the game plan in 2-3 "
             f"short paragraphs, citing cards by name."
         )
         explanation = generate(question, deck_context(result))
 
-    # Group copies for display: one entry per (name, pitch) with a count.
-    from collections import Counter
+    def _grouped(cards):
+        """One entry per (name, pitch) with a count — the display unit."""
+        from collections import Counter
 
-    counts = Counter((c.name, c.pitch) for c in result.deck.cards)
-    by_key = {(c.name, c.pitch): c for c in result.deck.cards}
-    entries = []
-    for (name, pitch), n in sorted(counts.items()):
-        c = by_key[(name, pitch)]
+        counts = Counter((c.name, c.pitch) for c in cards)
+        by_key = {(c.name, c.pitch): c for c in cards}
+        out = []
+        for (name, pitch), n in sorted(counts.items()):
+            entry = _card_json(by_key[(name, pitch)])
+            entry["copies"] = n
+            out.append(entry)
+        return out
+
+    inventory = []
+    for c in sorted(pool.inventory, key=lambda c: (c.equipment_slot or "Weapon", c.name)):
         entry = _card_json(c)
-        entry["copies"] = n
-        entry["loadout"] = c.is_equipment or c.is_weapon
-        entries.append(entry)
+        entry["copies"] = 1
+        entry["slot"] = c.equipment_slot or "Weapon"
+        inventory.append(entry)
+
+    # Sideboard entries carry the matchup rationale parsed from the build notes.
+    sideboard = _grouped(pool.sideboard)
+    reasons = {n.split(" — ", 1)[0].lstrip("+ ").strip(): n for n in result.sideboard_notes if " — " in n}
+    for entry in sideboard:
+        note = reasons.get(entry["name"])
+        entry["reason"] = note.split(" — ", 1)[1] if note else ""
 
     return {
-        "hero": _card_json(result.deck.hero),
-        "format": result.deck.format,
+        "hero": _card_json(pool.hero),
+        "format": pool.format,
         "legal": result.validation.ok,
         "rounds": result.rounds,
         "queries": result.queries,
         "finisher_notes": result.finisher_notes,
+        "sideboard_notes": result.sideboard_notes,
         "warnings": result.warnings,
-        "cards": entries,
+        "pool_total": len(pool.all_cards),
+        "pool_max": get_format(pool.format).pool_max,
+        "inventory": inventory,
+        "deck": _grouped(pool.deck),
+        "sideboard": sideboard,
         "explanation": explanation,
     }
 

@@ -168,24 +168,36 @@ one experiment concluded.*
 - Hygiene: explicit `num_ctx=8192` on generation calls (Ollama's default
   truncates silently).
 
-## ⬜ Phase 9 — Card-pool registration & sideboarding
-*Goal: model deck registration the way the game actually works. Per the
-official TRP (rules.fabtcg.com/en/trp/07-constructed-formats/):*
-*CC: 1 adult hero + max 80 cards, ≤3 copies each, ≥60-card starting deck.
-Blitz: 1 young hero + max 52 cards, ≤1 copy per unique card, exactly-40
-starting deck.*
+## ✅ Phase 9 — Card-pool registration & sideboarding
+*Modelled registration the way the game does — and the TRP read paid off the
+same way Phase 5's eval did: it exposed a shipped bug.*
 
-1. **`CardPool` model**: hero + inventory (weapons + 1 head/chest/arms/legs)
-   + starting deck + sideboard (the registered pool beyond the deck).
-   Fixes two latent deck.py bugs found while reading the TRP: Blitz's
-   1-copy/exactly-40 rules and hero-age legality were unmodeled.
-2. **Validation upgrade**: per-format copy limits, pool caps, hero age,
-   equipment slot limits.
-3. **`build.py` generates full registrations**: main deck + inventory +
-   sideboard suggestions (matchup swaps), repair loop over the richer
-   validator.
-4. **Render the registration properly** (CLI + web): playable deck vs
-   inventory vs sideboard as distinct sections.
+- **The headline finding — a per-NAME copy bug.** The TRP limits copies "per
+  unique card", and CR 2.7.1/2.8.1 define uniqueness as **name + pitch**.
+  deck.py counted by name, so it wrongly rejected a legal 3×red + 3×blue of one
+  name (six cards, two unique cards, each ≤3) and couldn't express Blitz's
+  1-per-unique rule. Fixed across the validator, the build prompt, and the
+  finisher's clamp — now keyed on (name, pitch). A real Blitz build proves it:
+  Ira's deck runs Flic Flak at pitch 1, 2 AND 3, one copy each, all legal.
+- **`formats.py`** — one `FormatRules` table (size / pool cap / copy limit /
+  hero age), replacing the scattered MIN_DECK_SIZE / MAX_COPIES / alias maps.
+  CC: adult, ≥60, ≤80 pool, ≤3. Blitz: young, exactly-40, ≤52 pool, ≤1.
+- **`pool.py` — `CardPool` + `validate_pool`**: hero + starting deck + equipped
+  inventory + sideboard. Models the rules that only exist once registration
+  does — ≤1 arena-card per Head/Chest/Arms/Legs/Off-Hand and ≤2 weapon-hands
+  (CR 4.1.4a), the pool cap, whole-pool copy limits, and hero age. The two
+  latent bugs the TRP read named (Blitz exact-40 + 1-copy, hero-age legality)
+  are now enforced; `build` fails fast on an adult hero in Blitz.
+- **`build.py` full registrations**: the picked equipment becomes the starting
+  inventory (slot-clamped, auto-equips a weapon if none chosen); a new LLM call
+  suggests a **matchup sideboard** (reason + swap target per card), grounded in
+  the hero pool and capped to the format's pool rules — best-effort, never
+  breaking the legal-registration contract. Hardened `_resolve_picks` against
+  the 7B's bare-string picks (a latent crash the new path surfaced).
+- **Rendered as three sections** (CLI + web): inventory by slot · deck by pitch
+  · sideboard with rationale, plus the pool total / cap.
+- Eval unchanged (0.842 recall@8 / 0.723 MRR) — the pool layer doesn't touch
+  retrieval.
 
 ## ⬜ Phase 10 — Deck workspace *(chat + stats)*
 *Goal: from "generate a deck" to "work on a deck".*

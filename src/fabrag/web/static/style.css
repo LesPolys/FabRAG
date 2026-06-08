@@ -160,6 +160,13 @@ nav { display: flex; gap: 0.4rem; }
 .pitch-group.p2 h3 { border-color: var(--yellow); }
 .pitch-group.p3 h3 { border-color: var(--blue); }
 .pitch-group.loadout h3 { border-color: var(--accent); }
+.pitch-group.sideboard h3 { border-color: var(--muted); }
+
+/* Per-card registration caption: the inventory slot, or a sideboard rationale. */
+.card-cell .reg-tag {
+  margin-top: 0.2rem; font-size: 0.72rem; line-height: 1.25; color: var(--muted);
+  text-align: center; font-style: italic;
+}
 .spin::after { content: " ⏳"; }
 
 /* --- pager ------------------------------------------------------------------- */

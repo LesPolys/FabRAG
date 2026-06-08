@@ -43,6 +43,11 @@ TALENTS: frozenset[str] = frozenset({
     "Mystic", "Royal", "Shadow",
 })
 
+# Equipment "slots" — the body zones a piece of equipment occupies. A hero
+# starts with at most one arena-card per slot (CR 4.1.4a). Weapons live in the
+# weapon zone(s) and are governed by hand count, not these slots.
+SLOTS: frozenset[str] = frozenset({"Head", "Chest", "Arms", "Legs", "Off-Hand"})
+
 # "What kind of card is this" — the supertypes we filter on.
 CARD_CATEGORIES: frozenset[str] = frozenset({
     "Action", "Instant", "Attack", "Attack Reaction", "Defense Reaction",
@@ -260,12 +265,26 @@ class Card(BaseModel):
         return "Hero" in self.types
 
     @property
+    def is_young(self) -> bool:
+        """Young heroes are Blitz/Commoner-legal; adult heroes are CC-legal.
+        'Young' is a type token (74 hero cards carry it); its absence on a hero
+        means adult."""
+        return "Young" in self.types
+
+    @property
     def is_equipment(self) -> bool:
         return "Equipment" in self.types
 
     @property
     def is_weapon(self) -> bool:
         return "Weapon" in self.types
+
+    @property
+    def equipment_slot(self) -> str | None:
+        """The body slot this equipment occupies (Head/Chest/Arms/Legs/Off-Hand),
+        or None for non-equipment. Cards carry exactly one slot token in the
+        data, so the first match is the slot."""
+        return next((t for t in self.types if t in SLOTS), None)
 
     # ---- the text we will embed ---------------------------------------------
     @property
