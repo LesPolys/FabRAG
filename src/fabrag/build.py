@@ -29,6 +29,7 @@ Two constraint tiers, deliberately distinct (mirroring rag.py's split):
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 
 import ollama
@@ -60,10 +61,16 @@ PER_QUERY_K = 20        # candidates retrieved per strategy-derived query
 # Step 1 — strategy -> retrieval queries
 # =============================================================================
 _QUERY_PROMPT = """\
-You translate a Flesh and Blood deck strategy into search queries. Given a hero
-and a strategy, produce 4-6 short retrieval queries that would find cards
-supporting that strategy. Cover different needs: core engine cards, attacks,
-defensive options, resource/utility. Respond with JSON only:
+You turn a Flesh and Blood deck strategy into search queries for a card-search
+engine. The search is ALREADY restricted to this hero's legal cards, so your
+queries must describe what cards DO — their effects and roles — and must NOT
+mention the hero's name, class, or talent. Those words add nothing here and make
+every query collapse onto the same results (the bug this prompt fixes).
+
+Produce 4-6 SHORT queries, each targeting a DIFFERENT need — for example: the
+core engine/payoff, efficient offense, defensive answers, resource or
+card-advantage, and one strategy-specific piece of tech. Keep them distinct from
+one another. Respond with JSON only:
 {"queries": ["...", "..."]}\
 """
 
@@ -77,12 +84,45 @@ _FALLBACK_QUERIES = [
 ]
 
 
+def _diversify(queries: list[str], hero: Card) -> list[str]:
+    """Strip hero proper-nouns and collapse near-duplicates.
+
+    Even when asked not to, a 7B happily prefixes every query with the hero
+    name ("attacks for Ira", "Ira's defense"), so all 4-6 embed to nearly the
+    same vector and retrieve the same cards — the diversity the decomposition
+    was supposed to buy evaporates. We scrub the hero's name (and its first
+    token, the usual culprit) and dedupe case-insensitively as a deterministic
+    backstop to the prompt.
+    """
+    first = re.split(r"[^A-Za-z0-9]+", hero.name)[0]
+    scrub = re.compile(re.escape(hero.name) + r"|\b" + re.escape(first) + r"\b", re.IGNORECASE)
+    edge = {"for", "with", "using", "to", "of", "and", "the", "a", "an", "in", "on", "that"}
+    out: list[str] = []
+    seen: set[str] = set()
+    for q in queries:
+        q = re.sub(r"\s{2,}", " ", scrub.sub("", q)).strip(" ,-—'\"").strip()
+        # Scrubbing a trailing "...for Ira" leaves a dangling preposition; drop
+        # connective words stranded at either end.
+        words = q.split()
+        while words and words[0].lower() in edge:
+            words.pop(0)
+        while words and words[-1].lower() in edge:
+            words.pop()
+        q = " ".join(words)
+        key = q.lower()
+        if len(q) >= 4 and key not in seen:
+            seen.add(key)
+            out.append(q)
+    return out
+
+
 def derive_queries(hero: Card, strategy: str, *, model: str = CHAT_MODEL) -> list[str]:
-    """Ask the LLM to decompose the strategy into retrieval queries.
+    """Ask the LLM to decompose the strategy into DIVERSE retrieval queries.
 
     The decomposition step matters: one embedding of "aggro arcane wizard"
     averages all its facets into one vector (the same dilution problem chunking
-    fights); four focused queries each retrieve their own slice of the pool.
+    fights); four focused queries each retrieve their own slice of the pool —
+    but only if the queries are actually different, which `_diversify` enforces.
     """
     hero_desc = (
         f"{hero.name} — classes: {', '.join(hero.classes) or 'none'}; "
@@ -99,12 +139,16 @@ def derive_queries(hero: Card, strategy: str, *, model: str = CHAT_MODEL) -> lis
             format="json",
         )
         queries = [str(q) for q in json.loads(resp.message.content)["queries"]]
-        queries = [q.strip() for q in queries if q.strip()]
-        if 2 <= len(queries) <= 8:
-            return queries
+        queries = _diversify([q.strip() for q in queries if q.strip()], hero)
     except (json.JSONDecodeError, KeyError, TypeError):
-        pass
-    return _FALLBACK_QUERIES
+        queries = []
+
+    # Top up from the generic needs if scrubbing/dedup left us thin, so the
+    # candidate pool always has breadth (avoid dupes already present).
+    if len(queries) < 4:
+        have = {q.lower() for q in queries}
+        queries += [q for q in _FALLBACK_QUERIES if q.lower() not in have]
+    return queries[:8] if queries else _FALLBACK_QUERIES
 
 
 # =============================================================================
