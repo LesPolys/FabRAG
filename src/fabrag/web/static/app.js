@@ -230,13 +230,66 @@ const cursorNode = () => {
 /* ---------- build ----------
  * A build returns a full card-pool REGISTRATION: equipped inventory, the
  * starting deck (grouped by pitch), and a matchup sideboard. Each is its own
- * section. */
+ * section. The last build is kept so the deck chat can ground itself in it. */
+let lastBuild = null;
+let chatHistory = [];
 const PITCH_GROUPS = [
   { title: "Pitch 1 — red", cls: "p1", match: (c) => c.pitch === 1 },
   { title: "Pitch 2 — yellow", cls: "p2", match: (c) => c.pitch === 2 },
   { title: "Pitch 3 — blue", cls: "p3", match: (c) => c.pitch === 3 },
   { title: "Other", cls: "", match: (c) => ![1, 2, 3].includes(c.pitch) },
 ];
+
+/* Deck stats panel — three small bar charts from the API's stats block.
+ * Pitch bars are scaled to deck size (so widths read as % of the deck); cost
+ * and type bars are scaled to their own tallest bar (a relative histogram). */
+const PITCH_NAME = { 0: "No pitch", 1: "Red (1)", 2: "Yellow (2)", 3: "Blue (3)" };
+
+function statBar(label, count, denom, cls) {
+  const row = document.createElement("div");
+  row.className = "stat-row";
+  const l = document.createElement("span");
+  l.className = "stat-label";
+  l.textContent = label;
+  const track = document.createElement("span");
+  track.className = "stat-track";
+  const fill = document.createElement("span");
+  fill.className = "stat-fill " + cls;
+  fill.style.width = Math.round((count / (denom || 1)) * 100) + "%";
+  track.appendChild(fill);
+  const v = document.createElement("span");
+  v.className = "stat-val";
+  v.textContent = count;
+  row.append(l, track, v);
+  return row;
+}
+
+function statBlock(title, rows) {
+  const block = document.createElement("div");
+  block.className = "stat-block";
+  const h = document.createElement("h4");
+  h.textContent = title;
+  block.appendChild(h);
+  rows.forEach((r) => block.appendChild(r));
+  return block;
+}
+
+function renderStats(s) {
+  const wrap = document.createDocumentFragment();
+  const n = s.size || 1;
+  wrap.appendChild(statBlock("Pitch",
+    s.pitch.map((p) => statBar(PITCH_NAME[p.pitch] || "p" + p.pitch, p.count, n, "pitch-" + p.pitch))));
+
+  const maxCost = Math.max(1, ...s.cost_curve.map((c) => c.count));
+  wrap.appendChild(statBlock(
+    "Cost curve" + (s.avg_cost != null ? ` · avg ${s.avg_cost}` : ""),
+    s.cost_curve.map((c) => statBar(c.cost === -1 ? "X" : String(c.cost), c.count, maxCost, "cost"))));
+
+  const maxType = Math.max(1, ...s.types.map((t) => t.count));
+  wrap.appendChild(statBlock("Types",
+    s.types.map((t) => statBar(t.type, t.count, maxType, "type"))));
+  return wrap;
+}
 
 /* A titled card grid; `tag` optionally adds a per-card caption (slot, reason). */
 function buildSection(title, cls, cards, tag) {
@@ -292,6 +345,10 @@ $("build-form").addEventListener("submit", async (e) => {
       (d.finisher_notes.length ? `\nfinisher: ${d.finisher_notes.join("; ")}` : "") +
       (d.warnings.length ? `\n${d.warnings.map((w) => "note: " + w).join("\n")}` : "");
 
+    const heroEl = $("build-hero-card");
+    heroEl.replaceChildren(renderCardCell(d.hero));
+    $("build-stats").replaceChildren(renderStats(d.stats));
+
     const deckEl = $("build-deck");
     deckEl.replaceChildren();
     if (d.inventory.length) {
@@ -307,9 +364,83 @@ $("build-form").addEventListener("submit", async (e) => {
         (c) => c.reason));
     }
     $("build-explanation").textContent = d.explanation || "";
+
+    // Hand the freshly built deck to the chat and reset the conversation.
+    lastBuild = d;
+    chatHistory = [];
+    $("chat-log").replaceChildren();
+    $("build-chat").classList.remove("hidden");
+
     $("build-result").classList.remove("hidden");
   } catch (err) {
     status.classList.remove("spin");
     status.textContent = "error: " + err.message;
+  }
+});
+
+/* ---------- deck chat ----------
+ * Multi-turn, grounded in the last-built deck. POST rules out EventSource, so
+ * we read the SSE stream by hand with a fetch reader: 'token' events append
+ * live, 'done' ends the turn. The deck + full history ride along each request
+ * (the server is stateless). */
+function chatBubble(role, text) {
+  const b = document.createElement("div");
+  b.className = "chat-bubble " + role;
+  b.textContent = text;
+  $("chat-log").appendChild(b);
+  $("chat-log").scrollTop = $("chat-log").scrollHeight;
+  return b;
+}
+
+$("chat-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = $("chat-input");
+  const message = input.value.trim();
+  if (!message || !lastBuild) return;
+  input.value = "";
+  chatBubble("user", message);
+  const reply = chatBubble("assistant", "…");
+  let answer = "";
+  try {
+    const resp = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        hero: lastBuild.hero.name,
+        format: lastBuild.format,
+        deck: lastBuild.deck,
+        inventory: lastBuild.inventory,
+        sideboard: lastBuild.sideboard,
+        history: chatHistory,
+        message,
+      }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const blocks = buf.split("\n\n");
+      buf = blocks.pop();                        // keep the trailing partial
+      for (const block of blocks) {
+        const ev = /event: (\w+)/.exec(block);
+        const dataLine = /data: (.*)/s.exec(block);
+        if (!ev || !dataLine) continue;
+        if (ev[1] === "token") {
+          answer += JSON.parse(dataLine[1]).t;
+          reply.textContent = answer;
+          $("chat-log").scrollTop = $("chat-log").scrollHeight;
+        }
+      }
+    }
+    reply.textContent = answer || "(no reply)";
+    chatHistory.push({ role: "user", content: message });
+    chatHistory.push({ role: "assistant", content: answer });
+  } catch (err) {
+    reply.textContent = "error: " + err.message;
   }
 });

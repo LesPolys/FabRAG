@@ -198,6 +198,54 @@ def api_ask(q: str, k: int = 8, source: str = "all", hero: str | None = None):
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
+class ChatRequest(BaseModel):
+    hero: str
+    format: str = "cc"
+    deck: list[dict] = []        # grouped rows: {name, pitch, copies}
+    inventory: list[dict] = []
+    sideboard: list[dict] = []
+    history: list[dict] = []     # prior turns: {role, content}
+    message: str
+
+
+@app.post("/api/chat")
+def api_chat(req: ChatRequest):
+    """Multi-turn deck chat over POST (the deck + history don't fit a query
+    string). Same SSE shape as /api/ask — a 'grounding' event then 'token's —
+    but read by the frontend with fetch+reader, since POST rules out EventSource.
+
+    Stateless: the client holds the deck and history and replays them each turn,
+    so the server reconstructs only what grounding needs — the hero (for the
+    pool predicate) and a textual decklist (from the grouped rows sent)."""
+    from .. import chat
+    from ..deck import find_hero
+
+    cards = [d for d in rag.get_retriever().docs if isinstance(d, Card)]
+    try:
+        hero = find_hero(req.hero, cards)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    def rows(entries):
+        return [(e.get("name", ""), e.get("pitch"), e.get("copies", 1)) for e in entries]
+
+    deck_text = chat.deck_to_text(
+        hero.name, req.format, rows(req.deck), rows(req.inventory), rows(req.sideboard)
+    )
+
+    def stream():
+        results, tokens = chat.deck_chat_stream(
+            hero, req.format, deck_text, req.history, req.message
+        )
+        grounding = json.dumps({"results": [_result_json(r) for r in results]})
+        yield f"event: grounding\ndata: {grounding}\n\n"
+        for t in tokens:
+            yield f"event: token\ndata: {json.dumps({'t': t})}\n\n"
+        yield "event: done\ndata: {}\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
 class BuildRequest(BaseModel):
     hero: str
     strategy: str = "a balanced, efficient deck"
@@ -211,6 +259,7 @@ def api_build(req: BuildRequest):
     spinner with honest expectations beats premature job-queue machinery."""
     from ..build import build_deck, deck_context
     from ..formats import get_format
+    from ..stats import deck_stats
 
     try:
         result = build_deck(req.hero, req.strategy, req.format)
@@ -251,11 +300,28 @@ def api_build(req: BuildRequest):
         inventory.append(entry)
 
     # Sideboard entries carry the matchup rationale parsed from the build notes.
+    # A note reads "+ Name (pitch N) — reason; for X"; key it by Name alone (the
+    # pitch suffix would otherwise never match the entry's name).
+    def _note_name(note: str) -> str:
+        head = note.lstrip("+ ").split(" — ", 1)[0]
+        return head.split(" (pitch ", 1)[0].strip()
+
     sideboard = _grouped(pool.sideboard)
-    reasons = {n.split(" — ", 1)[0].lstrip("+ ").strip(): n for n in result.sideboard_notes if " — " in n}
+    reasons = {_note_name(n): n.split(" — ", 1)[1] for n in result.sideboard_notes if " — " in n}
     for entry in sideboard:
-        note = reasons.get(entry["name"])
-        entry["reason"] = note.split(" — ", 1)[1] if note else ""
+        entry["reason"] = reasons.get(entry["name"], "")
+
+    s = deck_stats(pool)
+    # JSON object keys are strings; ints would round-trip as strings anyway, so
+    # make the conversion explicit and send count lists the frontend can map.
+    stats = {
+        "size": s.size,
+        "avg_cost": s.avg_cost,
+        "total_pitch": s.total_pitch,
+        "pitch": [{"pitch": p, "count": c} for p, c in s.pitch.items()],
+        "cost_curve": [{"cost": cost, "count": c} for cost, c in s.cost_curve.items()],
+        "types": [{"type": t, "count": c} for t, c in s.types.items()],
+    }
 
     return {
         "hero": _card_json(pool.hero),
@@ -271,6 +337,7 @@ def api_build(req: BuildRequest):
         "inventory": inventory,
         "deck": _grouped(pool.deck),
         "sideboard": sideboard,
+        "stats": stats,
         "explanation": explanation,
     }
 

@@ -77,9 +77,22 @@
     <div id="build-status" class="status"></div>
     <div id="build-result" class="hidden">
       <div id="build-meta" class="build-meta"></div>
+      <div class="build-top">
+        <div id="build-hero-card"></div>
+        <div id="build-stats" class="stats-panel"></div>
+      </div>
       <div id="build-deck"></div>
       <h3>Game plan</h3>
       <div id="build-explanation" class="answer"></div>
+      <div id="build-chat" class="deck-chat hidden">
+        <h3>Ask about this deck</h3>
+        <div id="chat-log" class="chat-log"></div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" type="text" autocomplete="off"
+                 placeholder="why these defense reactions? what would help vs arcane?">
+          <button type="submit">Ask</button>
+        </form>
+      </div>
     </div>
   </main>
 
