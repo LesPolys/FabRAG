@@ -169,9 +169,11 @@ def _cmd_build(args: argparse.Namespace) -> int:
         for note in result.sideboard_notes:
             print(f"  {note}")
 
-    # 4. Stats — the deck's pitch / cost / type shape.
+    # 4. Stats + quality — the deck's shape, and a heuristic goodness scorecard.
+    from .deck_quality import render_quality, score_deck
     from .stats import deck_stats, render_stats
     print("\n" + render_stats(deck_stats(pool)))
+    print("\n" + render_quality(score_deck(pool)))
 
     for w in result.warnings:
         print(f"\n  note: {w}")

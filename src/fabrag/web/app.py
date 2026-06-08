@@ -258,6 +258,7 @@ def api_build(req: BuildRequest):
     """Synchronous on purpose: a build is 1-3 minutes of LLM rounds, and a
     spinner with honest expectations beats premature job-queue machinery."""
     from ..build import build_deck, deck_context
+    from ..deck_quality import score_deck
     from ..formats import get_format
     from ..stats import deck_stats
 
@@ -323,6 +324,12 @@ def api_build(req: BuildRequest):
         "types": [{"type": t, "count": c} for t, c in s.types.items()],
     }
 
+    q = score_deck(pool)
+    quality = {
+        "overall": q.overall,
+        "dimensions": [{"name": d.name, "score": d.score, "note": d.note} for d in q.dimensions],
+    }
+
     return {
         "hero": _card_json(pool.hero),
         "format": pool.format,
@@ -338,6 +345,7 @@ def api_build(req: BuildRequest):
         "deck": _grouped(pool.deck),
         "sideboard": sideboard,
         "stats": stats,
+        "quality": quality,
         "explanation": explanation,
     }
 

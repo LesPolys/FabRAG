@@ -181,6 +181,8 @@ nav { display: flex; gap: 0.4rem; }
 .stat-fill.pitch-2 { background: var(--yellow); }
 .stat-fill.pitch-3 { background: var(--blue); }
 .stat-val { font-size: 0.78rem; color: var(--ink); text-align: right; }
+.quality-block { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.8rem; }
+.quality-block .stat-row { cursor: help; }   /* note shows on hover (title attr) */
 
 /* Deck chat — a grounded conversation about the built deck. */
 .deck-chat { margin-top: 1.6rem; }
