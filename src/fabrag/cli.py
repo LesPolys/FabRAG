@@ -169,6 +169,10 @@ def _cmd_build(args: argparse.Namespace) -> int:
         for note in result.sideboard_notes:
             print(f"  {note}")
 
+    # 4. Stats — the deck's pitch / cost / type shape.
+    from .stats import deck_stats, render_stats
+    print("\n" + render_stats(deck_stats(pool)))
+
     for w in result.warnings:
         print(f"\n  note: {w}")
 
@@ -177,6 +181,42 @@ def _cmd_build(args: argparse.Namespace) -> int:
         for piece in explain_deck_stream(result, args.strategy):
             print(piece, end="", flush=True)
         print()
+    return 0
+
+
+def _cmd_chat(args: argparse.Namespace) -> int:
+    """fabrag chat: build a deck, then talk about it — grounded in the hero's
+    legal pool + the rules corpus, streamed turn by turn."""
+    from .build import build_deck
+    from .chat import deck_chat_stream, pool_to_text
+
+    try:
+        result = build_deck(args.hero, args.strategy, args.format)
+    except ValueError as e:  # bad hero name / wrong-age hero
+        print(e, file=sys.stderr)
+        return 1
+
+    pool = result.pool
+    print(f"Built {pool.hero.name} ({pool.format}) — {len(pool.deck)} cards, "
+          f"{len(pool.inventory)} equipped, {len(pool.sideboard)} sideboard.")
+    print("Ask about the deck; blank line or Ctrl-D to quit.")
+    deck_text = pool_to_text(pool)
+    history: list[dict] = []
+    while True:
+        try:
+            question = input("\n> ").strip()
+        except EOFError:
+            break
+        if not question:
+            break
+        _results, stream = deck_chat_stream(pool.hero, pool.format, deck_text, history, question)
+        answer = ""
+        for piece in stream:
+            print(piece, end="", flush=True)
+            answer += piece
+        print()
+        history.append({"role": "user", "content": question})
+        history.append({"role": "assistant", "content": answer})
     return 0
 
 
@@ -282,6 +322,15 @@ def main(argv: list[str] | None = None) -> int:
     p_build.add_argument("--no-explain", action="store_true",
                          help="skip the LLM game-plan explanation")
     p_build.set_defaults(func=_cmd_build)
+
+    p_chat = sub.add_parser("chat", help="build a deck, then chat about it (grounded)")
+    p_chat.add_argument("--hero", required=True, metavar="NAME",
+                        help="hero to build for (partial names ok if unambiguous)")
+    p_chat.add_argument("--strategy", default="a balanced, efficient deck",
+                        help="deck strategy/archetype in plain words")
+    p_chat.add_argument("--format", default="cc", dest="format",
+                        help="format: cc / blitz / commoner (default: cc)")
+    p_chat.set_defaults(func=_cmd_chat)
 
     p_serve = sub.add_parser("serve", help="start the web UI")
     p_serve.add_argument("--host", default="127.0.0.1")

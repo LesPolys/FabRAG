@@ -100,3 +100,29 @@ def generate_stream(
         piece = chunk.message.content
         if piece:
             yield piece
+
+
+def chat_stream(
+    messages: list[dict],
+    *,
+    model: str = CHAT_MODEL,
+    temperature: float = DEFAULT_TEMPERATURE,
+) -> Iterator[str]:
+    """Stream a reply over a full multi-turn `messages` list (the multi-turn
+    sibling of generate_stream).
+
+    Single-turn generation owns its message list; a CONVERSATION (Phase 10's
+    deck chat) needs system + prior turns + the new grounded turn, assembled by
+    the caller. Same model/options, same token-streaming shape — only the
+    message construction differs.
+    """
+    stream = ollama.chat(
+        model=model,
+        messages=messages,
+        options={"temperature": temperature, "num_ctx": NUM_CTX},
+        stream=True,
+    )
+    for chunk in stream:
+        piece = chunk.message.content
+        if piece:
+            yield piece

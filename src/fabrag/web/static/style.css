@@ -167,6 +167,29 @@ nav { display: flex; gap: 0.4rem; }
   margin-top: 0.2rem; font-size: 0.72rem; line-height: 1.25; color: var(--muted);
   text-align: center; font-style: italic;
 }
+
+/* Hero card + stats panel sit side by side above the decklist. */
+.build-top { display: flex; gap: 1.2rem; align-items: flex-start; margin: 1rem 0 1.4rem; flex-wrap: wrap; }
+#build-hero-card { width: 180px; flex: 0 0 auto; }
+.stats-panel { flex: 1 1 320px; display: flex; flex-direction: column; gap: 1rem; }
+.stat-block h4 { margin: 0 0 0.4rem; font-size: 0.92rem; color: var(--accent); }
+.stat-row { display: grid; grid-template-columns: 5.5rem 1fr 1.8rem; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+.stat-label { font-size: 0.78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-track { background: rgba(255,255,255,0.06); border-radius: 4px; height: 14px; overflow: hidden; }
+.stat-fill { display: block; height: 100%; border-radius: 4px; background: var(--accent); min-width: 2px; }
+.stat-fill.pitch-1 { background: var(--red); }
+.stat-fill.pitch-2 { background: var(--yellow); }
+.stat-fill.pitch-3 { background: var(--blue); }
+.stat-val { font-size: 0.78rem; color: var(--ink); text-align: right; }
+
+/* Deck chat — a grounded conversation about the built deck. */
+.deck-chat { margin-top: 1.6rem; }
+.chat-log { display: flex; flex-direction: column; gap: 0.5rem; max-height: 360px; overflow-y: auto; margin-bottom: 0.7rem; }
+.chat-bubble { padding: 0.5rem 0.75rem; border-radius: 10px; max-width: 80%; white-space: pre-wrap; line-height: 1.4; font-size: 0.9rem; }
+.chat-bubble.user { align-self: flex-end; background: var(--accent); color: #14161a; }
+.chat-bubble.assistant { align-self: flex-start; background: var(--panel); border: 1px solid rgba(255,255,255,0.08); }
+.chat-form { display: flex; gap: 0.5rem; }
+.chat-form input { flex: 1; }
 .spin::after { content: " ⏳"; }
 
 /* --- pager ------------------------------------------------------------------- */

@@ -141,8 +141,9 @@ Living Legend, Silver Age, UPF), stored losslessly.
 ---
 
 *Phases 0–7 (the original plan) are complete: `fabrag search` · `ask` ·
-`build` · `eval` · `serve`. Phases 8–10 extend the deck-building flow into a
-real product surface.*
+`build` · `eval` · `serve`. Phases 8–10 extended the deck-building flow into a
+real product surface — eval-tuned retrieval, full card-pool registration, and
+a deck workspace with stats + a grounded `fabrag chat`. All eleven phases land.*
 
 ## ✅ Phase 8 — Eval deepening & retrieval tuning
 *Turned the knobs Phase 5 built the dial for — one changed, one validated,
@@ -199,21 +200,31 @@ same way Phase 5's eval did: it exposed a shipped bug.*
 - Eval unchanged (0.842 recall@8 / 0.723 MRR) — the pool layer doesn't touch
   retrieval.
 
-## ⬜ Phase 10 — Deck workspace *(chat + stats)*
-*Goal: from "generate a deck" to "work on a deck".*
+## ✅ Phase 10 — Deck workspace *(chat + stats)*
+*From "generate a deck" to "work on a deck" — the conversational capstone.*
 
-1. **Deck stats panel**: pitch distribution, cost curve, card-type breakdown
-   (API + web UI).
-2. **Hero card displayed** in the deck view, with the registration sections
-   from Phase 9.
-3. **Deck chat**: a conversational agent grounded in the current pool +
-   rules corpus — discuss the deck, ask "why this card", request swap
-   suggestions; the agent can search the hero pool and cite rules. Extends
-   Phase 6's agentic loop with multi-turn state.
+- **`stats.py` — `deck_stats`**: pitch distribution, cost curve, and card-type
+  breakdown (a `primary_type` priority picks one bucket per card) over the
+  starting deck. Descriptive only — deck.py/build.py keep the "should it differ"
+  judgement. Surfaced in the CLI build (`render_stats`) and the web build
+  response (a `stats` block the panel renders as three bar charts).
+- **Hero card + stats panel** in the web deck view, above the registration
+  sections Phase 9 added.
+- **`chat.py` — deck chat**: a multi-turn assistant grounded in ONE built deck
+  plus the rules corpus. Each turn retrieves rules + HERO-LEGAL cards
+  (`rag.retrieve` with the hero-pool predicate, so suggested swaps are always
+  legal) and answers with the deck in the system prompt, prior turns as history,
+  and a fresh CONTEXT block — extending Phase 3's grounded-answer contract to
+  conversation via a new `generation.chat_stream`. Stateless engine: the caller
+  replays deck + history each turn, so the CLI REPL (`fabrag chat`) and the web
+  workspace (`POST /api/chat`, SSE read by a fetch reader) drive it identically.
+- Verified live: a Blitz build returns the full stats/registration JSON; a chat
+  turn streamed 61 tokens of a coherent, deck-grounded answer.
 
 ### Carryover parking lot
-Strategy-query diversity in build.py; deck-QUALITY eval (legality is
-measured, goodness isn't) — natural companion to Phase 10's stats.
+Strategy-query diversity in build.py (hero name dominates every query);
+deck-QUALITY eval (legality is measured, goodness isn't); a tool-calling chat
+where the model *decides* when to search (vs. always retrieving per turn).
 
 ---
 
