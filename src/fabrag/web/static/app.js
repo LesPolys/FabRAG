@@ -227,15 +227,40 @@ const cursorNode = () => {
   return s;
 };
 
-/* ---------- build ---------- */
+/* ---------- build ----------
+ * A build returns a full card-pool REGISTRATION: equipped inventory, the
+ * starting deck (grouped by pitch), and a matchup sideboard. Each is its own
+ * section. */
 const PITCH_GROUPS = [
-  { key: "loadout", title: "Loadout — equipment & weapons", cls: "loadout",
-    match: (c) => c.loadout },
-  { key: "p1", title: "Pitch 1 — red", cls: "p1", match: (c) => !c.loadout && c.pitch === 1 },
-  { key: "p2", title: "Pitch 2 — yellow", cls: "p2", match: (c) => !c.loadout && c.pitch === 2 },
-  { key: "p3", title: "Pitch 3 — blue", cls: "p3", match: (c) => !c.loadout && c.pitch === 3 },
-  { key: "other", title: "Other", cls: "", match: (c) => !c.loadout && ![1, 2, 3].includes(c.pitch) },
+  { title: "Pitch 1 — red", cls: "p1", match: (c) => c.pitch === 1 },
+  { title: "Pitch 2 — yellow", cls: "p2", match: (c) => c.pitch === 2 },
+  { title: "Pitch 3 — blue", cls: "p3", match: (c) => c.pitch === 3 },
+  { title: "Other", cls: "", match: (c) => ![1, 2, 3].includes(c.pitch) },
 ];
+
+/* A titled card grid; `tag` optionally adds a per-card caption (slot, reason). */
+function buildSection(title, cls, cards, tag) {
+  const section = document.createElement("section");
+  section.className = "pitch-group " + cls;
+  const h = document.createElement("h3");
+  const n = cards.reduce((acc, c) => acc + (c.copies || 1), 0);
+  h.textContent = `${title} (${n})`;
+  const grid = document.createElement("div");
+  grid.className = "card-grid small";
+  cards.forEach((c) => {
+    const cell = renderCardCell(c);
+    const text = tag && tag(c);
+    if (text) {
+      const d = document.createElement("div");
+      d.className = "reg-tag";
+      d.textContent = text;
+      cell.appendChild(d);
+    }
+    grid.appendChild(cell);
+  });
+  section.append(h, grid);
+  return section;
+}
 
 $("build-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -259,29 +284,27 @@ $("build-form").addEventListener("submit", async (e) => {
     status.textContent = "";
     status.classList.remove("spin");
 
-    const main = d.cards.filter((c) => !c.loadout)
-                        .reduce((n, c) => n + (c.copies || 1), 0);
+    const deckN = d.deck.reduce((n, c) => n + (c.copies || 1), 0);
+    const cap = d.pool_max ? `/${d.pool_max}` : "";
     $("build-meta").textContent =
-      `${d.hero.name} — ${d.format} · ${main} main-deck cards · legal: ${d.legal} · ` +
-      `${d.rounds} LLM round(s)` +
+      `${d.hero.name} — ${d.format} · ${deckN} deck cards · ` +
+      `pool ${d.pool_total}${cap} · legal: ${d.legal} · ${d.rounds} LLM round(s)` +
       (d.finisher_notes.length ? `\nfinisher: ${d.finisher_notes.join("; ")}` : "") +
       (d.warnings.length ? `\n${d.warnings.map((w) => "note: " + w).join("\n")}` : "");
 
     const deckEl = $("build-deck");
     deckEl.replaceChildren();
+    if (d.inventory.length) {
+      deckEl.appendChild(buildSection("Inventory — equipped", "loadout", d.inventory,
+        (c) => c.slot));
+    }
     for (const g of PITCH_GROUPS) {
-      const cards = d.cards.filter(g.match);
-      if (!cards.length) continue;
-      const section = document.createElement("section");
-      section.className = "pitch-group " + g.cls;
-      const h = document.createElement("h3");
-      const n = cards.reduce((acc, c) => acc + (c.copies || 1), 0);
-      h.textContent = `${g.title} (${n})`;
-      const grid = document.createElement("div");
-      grid.className = "card-grid small";
-      cards.forEach((c) => grid.appendChild(renderCardCell(c)));
-      section.append(h, grid);
-      deckEl.appendChild(section);
+      const cards = d.deck.filter(g.match);
+      if (cards.length) deckEl.appendChild(buildSection(g.title, g.cls, cards));
+    }
+    if (d.sideboard.length) {
+      deckEl.appendChild(buildSection("Sideboard — matchup tech", "sideboard", d.sideboard,
+        (c) => c.reason));
     }
     $("build-explanation").textContent = d.explanation || "";
     $("build-result").classList.remove("hidden");

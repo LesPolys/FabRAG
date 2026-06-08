@@ -119,46 +119,55 @@ _PITCH_LABEL = {1: "Pitch 1 (red)", 2: "Pitch 2 (yellow)", 3: "Pitch 3 (blue)"}
 
 
 def _cmd_build(args: argparse.Namespace) -> int:
-    """fabrag build: hero + strategy -> a guaranteed-legal decklist + rationale."""
+    """fabrag build: hero + strategy -> a guaranteed-legal registration + rationale."""
     from collections import Counter
 
     from .build import build_deck, explain_deck_stream
+    from .formats import get_format
 
     try:
         result = build_deck(args.hero, args.strategy, args.format)
-    except ValueError as e:  # bad hero name / ambiguous match
+    except ValueError as e:  # bad hero name / ambiguous match / wrong-age hero
         print(e, file=sys.stderr)
         return 1
 
-    deck = result.deck
-    print(f"Hero:     {deck.hero.name} ({deck.hero.type_text})")
-    print(f"Format:   {deck.format}   |   strategy: {args.strategy}")
+    pool = result.pool
+    rules = get_format(pool.format)
+    total = len(pool.all_cards)
+    cap = f"/{rules.pool_max}" if rules.pool_max else ""
+    print(f"Hero:     {pool.hero.name} ({pool.hero.type_text})")
+    print(f"Format:   {rules.label}   |   strategy: {args.strategy}")
     print(f"Sourcing: {', '.join(result.queries)}")
     print(f"Rounds:   {result.rounds}"
           + (f"   |   finisher: {'; '.join(result.finisher_notes)}" if result.finisher_notes else ""))
-    print(f"Legal:    {result.validation.ok}")
+    print(f"Legal:    {result.validation.ok}   |   pool: {total}{cap} registered cards")
 
-    # Decklist grouped: loadout first, then main deck by pitch.
+    # 1. Inventory — the equipped weapons & equipment, by slot.
+    if pool.inventory:
+        print(f"\nInventory ({len(pool.inventory)}):")
+        for c in sorted(pool.inventory, key=lambda c: (c.equipment_slot or "Weapon", c.name)):
+            slot = c.equipment_slot or "Weapon"
+            print(f"  [{slot}] {c.name} — {c.type_text}")
+
+    # 2. Starting deck — grouped by pitch.
     groups: dict[str, list[tuple[int, str]]] = {}
-    counts = Counter((c.name, c.pitch) for c in deck.cards)
-    by_key = {(c.name, c.pitch): c for c in deck.cards}
+    counts = Counter((c.name, c.pitch) for c in pool.deck)
+    by_key = {(c.name, c.pitch): c for c in pool.deck}
     for (name, pitch), n in sorted(counts.items()):
         c = by_key[(name, pitch)]
-        if c.is_equipment or c.is_weapon:
-            label = "Loadout (equipment & weapons)"
-        else:
-            label = _PITCH_LABEL.get(pitch, "Other")
-        groups.setdefault(label, []).append((n, f"{name} — {c.type_text}"))
-    order = ["Loadout (equipment & weapons)", "Pitch 1 (red)", "Pitch 2 (yellow)",
-             "Pitch 3 (blue)", "Other"]
-    main_n = sum(n for (name, p), n in counts.items()
-                 if not (by_key[(name, p)].is_equipment or by_key[(name, p)].is_weapon))
-    print(f"\nDecklist ({main_n} main-deck cards):")
-    for label in order:
+        groups.setdefault(_PITCH_LABEL.get(pitch, "Other"), []).append((n, f"{name} — {c.type_text}"))
+    print(f"\nStarting deck ({len(pool.deck)} cards):")
+    for label in ["Pitch 1 (red)", "Pitch 2 (yellow)", "Pitch 3 (blue)", "Other"]:
         if label in groups:
             print(f"  {label}:")
             for n, line in groups[label]:
                 print(f"    {n}x {line}")
+
+    # 3. Sideboard — the LLM's matchup suggestions, with rationale.
+    if result.sideboard_notes:
+        print(f"\nSideboard ({len(pool.sideboard)} suggested):")
+        for note in result.sideboard_notes:
+            print(f"  {note}")
 
     for w in result.warnings:
         print(f"\n  note: {w}")

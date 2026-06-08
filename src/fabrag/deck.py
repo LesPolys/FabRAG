@@ -20,8 +20,13 @@ can't be expressed with CardFilter's any-of matching — a card with talents
 feed it to retrieval via the search `predicate` hook.
 
 Known simplifications (room to grow): 'Legendary' single-copy cards aren't
-flagged in the source data so we apply a flat max-3; equipment slot limits
-(one head, one chest, ...) and Blitz's exact-40 rule aren't modeled.
+flagged in the source data so we apply the format's flat copy limit. Equipment
+slot limits and the whole card-pool registration moved up into pool.py (Phase 9),
+which is where Blitz's exact-40 and pool-cap rules live; this module stays about
+a hero's eligible pool and a single deck's legality.
+
+Per-format rules (sizes, copy limits, hero age) come from formats.py — one
+table, read by every layer.
 """
 
 from __future__ import annotations
@@ -31,12 +36,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
 from .cards import Card
-
-# Minimum MAIN-deck size (excludes hero, weapons, equipment) by format.
-MIN_DECK_SIZE: dict[str, int] = {"cc": 60, "blitz": 40, "commoner": 40}
-_DEFAULT_MIN_DECK_SIZE = 60
-
-MAX_COPIES = 3  # max copies of a card (by name) in constructed formats
+from .formats import get_format, normalize_format
 
 # CR 1.3.2 splits cards into hero-, token-, deck-, and arena-cards; only
 # deck-cards may start in a deck. These type keywords mark the non-deck kinds
@@ -46,18 +46,6 @@ MAX_COPIES = 3  # max copies of a card (by name) in constructed formats
 # Invocations and Afflictions DO pitch and stay deckable (e.g. Dromai's
 # Invocations are real main-deck cards).
 NON_DECK_TYPES: frozenset[str] = frozenset({"Token", "Macro", "Landmark", "Demi-Hero"})
-
-# Mirror Legality's format aliases so callers can say "Classic Constructed".
-_FORMAT_ALIASES: dict[str, str] = {
-    "classic_constructed": "cc", "classic": "cc",
-    "living_legend": "ll", "silverage": "silver_age",
-    "ultimate_pit_fight": "upf", "pit_fight": "upf",
-}
-
-
-def _norm_fmt(fmt: str) -> str:
-    key = fmt.strip().lower().replace(" ", "_").replace("-", "_")
-    return _FORMAT_ALIASES.get(key, key)
 
 
 # --- hero lookup -------------------------------------------------------------
@@ -92,7 +80,7 @@ def ineligibility_reasons(card: Card, hero: Card, fmt: str = "cc") -> list[str]:
     if non_deck:
         reasons.append(f"{sorted(non_deck)} cards can't start in a deck (CR 1.3.2)")
     if not card.legality.is_legal(fmt):
-        reasons.append(f"not legal in {_norm_fmt(fmt)}")
+        reasons.append(f"not legal in {normalize_format(fmt)}")
 
     off_class = set(card.classes) - set(hero.classes)
     if off_class:
@@ -109,6 +97,33 @@ def ineligibility_reasons(card: Card, hero: Card, fmt: str = "cc") -> list[str]:
 def is_eligible(card: Card, hero: Card, fmt: str = "cc") -> bool:
     """True if `card` may legally be included in `hero`'s `fmt` deck."""
     return not ineligibility_reasons(card, hero, fmt)
+
+
+def hero_age_error(hero: Card, fmt: str) -> str | None:
+    """Why `hero` is the wrong age for `fmt`, or None if fine.
+
+    A hero-vs-format check (not a card-eligibility one): CC wants an adult hero,
+    Blitz a young one. Formats with `hero_age=None` (e.g. commoner here) impose
+    no restriction.
+    """
+    age = get_format(fmt).hero_age
+    if age == "young" and not hero.is_young:
+        return f"{hero.name} is an adult hero; {normalize_format(fmt)} requires a young hero"
+    if age == "adult" and hero.is_young:
+        return f"{hero.name} is a young hero; {normalize_format(fmt)} requires an adult hero"
+    return None
+
+
+def copy_limit_errors(cards: Iterable[Card], max_copies: int) -> list[str]:
+    """Copy-limit violations counted per UNIQUE card — (name, pitch), per
+    CR 2.7.1/2.8.1, NOT per name. So 3 red + 3 blue of one name is two unique
+    cards (legal at CC's limit of 3), while 4 of a single pitch is not."""
+    errors: list[str] = []
+    for (name, pitch), n in Counter((c.name, c.pitch) for c in cards).items():
+        if n > max_copies:
+            where = f" (pitch {pitch})" if pitch is not None else ""
+            errors.append(f"{n} copies of {name!r}{where}; max is {max_copies}")
+    return errors
 
 
 def hero_pool_predicate(hero: Card, fmt: str = "cc") -> Callable[[Card], bool]:
@@ -164,11 +179,16 @@ def validate_deck(deck: Deck) -> DeckValidation:
     """Check a decklist against the format's construction rules."""
     errors: list[str] = []
     warnings: list[str] = []
-    fmt = _norm_fmt(deck.format)
+    rules = get_format(deck.format)
+    fmt = rules.key
 
     if not deck.hero.is_hero:
         errors.append(f"{deck.hero.name!r} is not a hero card.")
         return DeckValidation(False, errors, warnings)  # rest assumes a real hero
+
+    age_problem = hero_age_error(deck.hero, fmt)
+    if age_problem:
+        errors.append(age_problem)
 
     # Every card must be eligible for the hero.
     for card in deck.cards:
@@ -176,17 +196,17 @@ def validate_deck(deck: Deck) -> DeckValidation:
         if reasons:
             errors.append(f"{card.name}: " + "; ".join(reasons))
 
-    # Main-deck size (loadout excluded).
+    # Main-deck size (loadout excluded). deck_max == deck_min means the format
+    # is exact-size (Blitz/Commoner are exactly 40, not "at least 40").
     main = [c for c in deck.cards if not _is_loadout(c)]
-    min_size = MIN_DECK_SIZE.get(fmt, _DEFAULT_MIN_DECK_SIZE)
-    if len(main) < min_size:
-        errors.append(
-            f"main deck has {len(main)} cards; {fmt} requires at least {min_size}"
-        )
+    n = len(main)
+    if rules.deck_max == rules.deck_min:
+        if n != rules.deck_min:
+            errors.append(f"main deck has {n} cards; {fmt} requires exactly {rules.deck_min}")
+    elif n < rules.deck_min:
+        errors.append(f"main deck has {n} cards; {fmt} requires at least {rules.deck_min}")
 
-    # Copy limit (by name; pitch variants share a name, so they share the budget).
-    for name, n in Counter(c.name for c in deck.cards).items():
-        if n > MAX_COPIES:
-            errors.append(f"{n} copies of {name!r}; max is {MAX_COPIES}")
+    # Copy limit, per unique card.
+    errors.extend(copy_limit_errors(deck.cards, rules.max_copies))
 
     return DeckValidation(not errors, errors, warnings)
