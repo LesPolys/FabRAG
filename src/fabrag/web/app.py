@@ -234,7 +234,7 @@ def api_chat(req: ChatRequest):
     )
 
     def stream():
-        results, tokens = chat.deck_chat_stream(
+        results, tokens = chat.deck_chat_agentic(
             hero, req.format, deck_text, req.history, req.message
         )
         grounding = json.dumps({"results": [_result_json(r) for r in results]})

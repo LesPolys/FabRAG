@@ -190,7 +190,7 @@ def _cmd_chat(args: argparse.Namespace) -> int:
     """fabrag chat: build a deck, then talk about it — grounded in the hero's
     legal pool + the rules corpus, streamed turn by turn."""
     from .build import build_deck
-    from .chat import deck_chat_stream, pool_to_text
+    from .chat import deck_chat_agentic, pool_to_text
 
     try:
         result = build_deck(args.hero, args.strategy, args.format)
@@ -211,7 +211,7 @@ def _cmd_chat(args: argparse.Namespace) -> int:
             break
         if not question:
             break
-        _results, stream = deck_chat_stream(pool.hero, pool.format, deck_text, history, question)
+        _results, stream = deck_chat_agentic(pool.hero, pool.format, deck_text, history, question)
         answer = ""
         for piece in stream:
             print(piece, end="", flush=True)
