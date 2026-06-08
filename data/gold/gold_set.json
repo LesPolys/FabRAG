@@ -3,28 +3,43 @@
     "id": "card-destroy-equipment-on-hit",
     "query": "cards that destroy an opponent's equipment when an attack hits",
     "kind": "card",
-    "expected": ["Buckle", "Colossal Bearing", "Powder Keg"],
+    "expected": [
+      "Buckle",
+      "Colossal Bearing",
+      "Powder Keg"
+    ],
     "notes": "Truth via exact text search: hits + destroy + equipment. All three verified by hand."
   },
   {
     "id": "card-prevent-arcane-damage",
     "query": "equipment I can destroy to prevent arcane damage",
     "kind": "card",
-    "expected": ["Enchanted Quiver", "Misfire Dampener", "Tremorshield Sabatons"],
+    "expected": [
+      "Enchanted Quiver",
+      "Misfire Dampener",
+      "Tremorshield Sabatons"
+    ],
     "notes": "All three equipment with 'Instant - Destroy this: Prevent the next 1 arcane damage'. Original phrasing ('cards that prevent arcane damage') had ~50 true answers (43 Arcane Barrier cards, Dampen, ...) and was unanswerable at k=8 — gold-set bug found by the eval itself."
   },
   {
     "id": "card-freeze-arsenal",
     "query": "freeze a card in the opponent's arsenal",
     "kind": "card",
-    "expected": ["Cold Snap", "Glacial Horns", "Icebind"],
+    "expected": [
+      "Cold Snap",
+      "Glacial Horns",
+      "Icebind"
+    ],
     "notes": "Truth via exact text search: freeze + arsenal."
   },
   {
     "id": "card-command-and-conquer",
     "query": "attack that destroys the cards in my opponent's arsenal when it hits",
     "kind": "card",
-    "expected": ["Command and Conquer", "Seek and Destroy"],
+    "expected": [
+      "Command and Conquer",
+      "Seek and Destroy"
+    ],
     "match": "any",
     "notes": "C&C is the iconic 'When this hits a hero, destroy all cards in their arsenal'; Seek and Destroy grants the same effect to an arrow attack. Either answers the need."
   },
@@ -32,7 +47,9 @@
     "id": "card-hit-draw",
     "query": "attack action card that draws me a card when it hits",
     "kind": "card",
-    "expected": ["Snatch"],
+    "expected": [
+      "Snatch"
+    ],
     "match": "any",
     "notes": "Snatch is the canonical 'When this hits, draw a card'; other cards share the effect so match=any."
   },
@@ -40,14 +57,22 @@
     "id": "card-sink-below",
     "query": "defense reaction that lets me put a card on the bottom of my deck to draw a new one",
     "kind": "card",
-    "expected": ["Sink Below"],
+    "expected": [
+      "Sink Below"
+    ],
     "notes": "Near-paraphrase of the card text; tests basic semantic matching."
   },
   {
     "id": "card-return-attack-from-grave",
     "query": "return an attack action card from my graveyard to my hand",
     "kind": "card",
-    "expected": ["Encore", "Backup Protocol: RED", "Backup Protocol: YEL", "Backup Protocol: BLU", "Regrowth // Shock"],
+    "expected": [
+      "Encore",
+      "Backup Protocol: RED",
+      "Backup Protocol: YEL",
+      "Backup Protocol: BLU",
+      "Regrowth // Shock"
+    ],
     "match": "any",
     "notes": "Several true answers (verified by text search); any one satisfies the need."
   },
@@ -55,14 +80,18 @@
     "id": "card-punish-opponent-draw",
     "query": "make my opponent discard when they draw cards",
     "kind": "card",
-    "expected": ["Anka, Drag Under"],
+    "expected": [
+      "Anka, Drag Under"
+    ],
     "notes": "'The next time an opponent draws ... they discard a card.'"
   },
   {
     "id": "rule-defend-how-many",
     "query": "how many cards can I defend an attack with?",
     "kind": "rule",
-    "expected": ["cr7.3.2"],
+    "expected": [
+      "cr7.3.2"
+    ],
     "match": "any",
     "notes": "CR 7.3.2: declare any number of non-defense-reaction cards from hand + equipment."
   },
@@ -70,7 +99,11 @@
     "id": "rule-dominate",
     "query": "what does dominate do?",
     "kind": "rule",
-    "expected": ["kw:Dominate", "gloss:Dominate", "cr8.3.4"],
+    "expected": [
+      "kw:Dominate",
+      "gloss:Dominate",
+      "cr8.3.4"
+    ],
     "match": "any",
     "notes": "Keyword reminder, glossary entry, and the authoritative CR 8.3.4 all answer this."
   },
@@ -78,7 +111,11 @@
     "id": "rule-go-again",
     "query": "what does go again do?",
     "kind": "rule",
-    "expected": ["kw:Go again", "gloss:Go again", "cr8.3.5"],
+    "expected": [
+      "kw:Go again",
+      "gloss:Go again",
+      "cr8.3.5"
+    ],
     "match": "any",
     "notes": "CR 8.3.5: 'Go again is a special resolution ability that means Gain 1 action point.'"
   },
@@ -86,7 +123,11 @@
     "id": "rule-intimidate",
     "query": "what does intimidate do to my opponent's hand?",
     "kind": "rule",
-    "expected": ["kw:Intimidate", "gloss:Intimidate", "cr8.5.9"],
+    "expected": [
+      "kw:Intimidate",
+      "gloss:Intimidate",
+      "cr8.5.9"
+    ],
     "match": "any",
     "notes": "CR 8.5.9 is the effect-keyword rule."
   },
@@ -94,7 +135,9 @@
     "id": "rule-chain-close",
     "query": "when does the combat chain close?",
     "kind": "rule",
-    "expected": ["cr7.7.*"],
+    "expected": [
+      "cr7.7.*"
+    ],
     "match": "any",
     "notes": "Section 7.7 Close Step."
   },
@@ -102,7 +145,9 @@
     "id": "rule-win-game",
     "query": "how do I win the game?",
     "kind": "rule",
-    "expected": ["cr4.5.*"],
+    "expected": [
+      "cr4.5.*"
+    ],
     "match": "any",
     "notes": "Section 4.5 Ending a Game (win/loss/draw conditions)."
   },
@@ -110,7 +155,10 @@
     "id": "rule-life-zero",
     "query": "what happens when a hero's life total is reduced to zero?",
     "kind": "rule",
-    "expected": ["cr4.5.*", "cr2.5.*"],
+    "expected": [
+      "cr4.5.*",
+      "cr2.5.*"
+    ],
     "match": "any",
     "notes": "4.5 covers losing the game; 2.5 is the life property itself."
   },
@@ -118,7 +166,10 @@
     "id": "rule-arsenal",
     "query": "what is the arsenal and how many cards can I keep there?",
     "kind": "rule",
-    "expected": ["cr3.3.*", "gloss:Arsenal"],
+    "expected": [
+      "cr3.3.*",
+      "gloss:Arsenal"
+    ],
     "match": "any",
     "notes": "Section 3.3 Arsenal (zone rules)."
   },
@@ -126,7 +177,10 @@
     "id": "rule-action-points",
     "query": "how many action points do I get on my turn?",
     "kind": "rule",
-    "expected": ["cr4.3.*", "gloss:Action Point"],
+    "expected": [
+      "cr4.3.*",
+      "gloss:Action Point"
+    ],
     "match": "any",
     "notes": "Action phase rules; glossary defines the resource."
   },
@@ -134,7 +188,9 @@
     "id": "rule-end-phase-draw",
     "query": "do I draw back up to my intellect at the end of my turn?",
     "kind": "rule",
-    "expected": ["cr4.4.*"],
+    "expected": [
+      "cr4.4.*"
+    ],
     "match": "any",
     "notes": "Section 4.4 End Phase (end-of-turn procedure incl. drawing up to intellect)."
   },
@@ -142,7 +198,10 @@
     "id": "rule-defense-reaction-timing",
     "query": "when am I allowed to play defense reaction cards?",
     "kind": "rule",
-    "expected": ["cr7.4.*", "gloss:Defense Reaction"],
+    "expected": [
+      "cr7.4.*",
+      "gloss:Defense Reaction"
+    ],
     "match": "any",
     "notes": "7.4 Reaction Step governs reaction timing."
   },
@@ -150,7 +209,11 @@
     "id": "rule-pitch",
     "query": "what happens to a card after I pitch it for resources?",
     "kind": "rule",
-    "expected": ["cr3.14.*", "cr2.8.*", "gloss:Pitch"],
+    "expected": [
+      "cr3.14.*",
+      "cr2.8.*",
+      "gloss:Pitch"
+    ],
     "match": "any",
     "notes": "3.14 Pitch zone; 2.8 pitch property; glossary term."
   },
@@ -158,7 +221,10 @@
     "id": "rule-instant-timing",
     "query": "when can I play an instant?",
     "kind": "rule",
-    "expected": ["gloss:Instant", "cr1.3.*"],
+    "expected": [
+      "gloss:Instant",
+      "cr1.3.*"
+    ],
     "match": "any",
     "notes": "Glossary defines instants; 1.3 covers playing objects/priority windows."
   },
@@ -166,8 +232,245 @@
     "id": "rule-defend-step",
     "query": "what happens during the defend step of combat?",
     "kind": "rule",
-    "expected": ["cr7.3.*"],
+    "expected": [
+      "cr7.3.*"
+    ],
     "match": "any",
     "notes": "Section 7.3 Defend Step."
+  },
+  {
+    "id": "card-bravo-specialization",
+    "query": "attack actions that require the Bravo specialization",
+    "kind": "card",
+    "expected": [
+      "Crippling Crush",
+      "Show Time!",
+      "Star Struck"
+    ],
+    "notes": "Exact text 'Bravo Specialization' — all three verified."
+  },
+  {
+    "id": "card-katsu-specialization",
+    "query": "cards only Katsu can put in his deck",
+    "kind": "card",
+    "expected": [
+      "Lord of Wind",
+      "Mugenshi: RELEASE",
+      "Retrace the Past",
+      "Visit the Floating Dojo"
+    ],
+    "notes": "Exact text 'Katsu Specialization'. Paraphrased query (specialization = hero-locked)."
+  },
+  {
+    "id": "card-block-defense-reactions",
+    "query": "attacks that prevent my opponent from playing defense reactions",
+    "kind": "card",
+    "expected": [
+      "Back Stab",
+      "Command and Conquer",
+      "Imperial Seal of Command",
+      "Remorseless"
+    ],
+    "notes": "Exact text 'defense reaction cards can't be played'. Co-occurrence-hard by design."
+  },
+  {
+    "id": "card-opt-2",
+    "query": "cards that let me opt 2",
+    "kind": "card",
+    "match": "any",
+    "expected": [
+      "Blood Tribute",
+      "Cindering Foresight",
+      "Clarity Potion",
+      "Dimenxxional Gateway",
+      "Even Bigger Than That!",
+      "Gaze the Ages",
+      "Opal Amulet",
+      "Talismanic Lens",
+      "Whisper of the Oracle"
+    ],
+    "notes": "Exact text 'Opt 2'; any of the nine answers the need."
+  },
+  {
+    "id": "card-arcane-weapon",
+    "query": "a weapon that deals arcane damage",
+    "kind": "card",
+    "match": "any",
+    "expected": [
+      "Aether Conduit",
+      "Dread Scythe",
+      "Galaxxi Black",
+      "Kraken's Aethervein",
+      "Rosetta Thorn",
+      "Scepter of Pain",
+      "Surgent Aethertide",
+      "Waning Moon"
+    ],
+    "notes": "Weapon type + 'deal N arcane damage' in text."
+  },
+  {
+    "id": "card-grant-dominate",
+    "query": "an action card that gives my next attack dominate",
+    "kind": "card",
+    "match": "any",
+    "expected": [
+      "Buckle",
+      "Convection Amplifier",
+      "Convulsions from the Bellows of Hell",
+      "Emerging Dominance",
+      "Flashfreeze",
+      "Polar Blast",
+      "Push Forward",
+      "Spill Blood",
+      "Tear Asunder",
+      "Weave Ice"
+    ],
+    "notes": "Non-attack actions whose text grants dominate."
+  },
+  {
+    "id": "card-create-frostbite",
+    "query": "cards that create Frostbite tokens",
+    "kind": "card",
+    "match": "any",
+    "expected": [
+      "Arctic Incarceration",
+      "Blizzard Bolt",
+      "Chill to the Bone",
+      "Coat of Frost",
+      "Emerging Avalanche",
+      "Endless Winter",
+      "Frozen to Death",
+      "Ice Quake",
+      "Icy Encounter",
+      "Iyslander",
+      "Iyslander, Stormbind",
+      "Jarl Vetreiði",
+      "Lexi",
+      "Lexi, Livewire",
+      "Ollin Ice Cap",
+      "Polar Cap",
+      "Snow Under",
+      "Stalagmite, Bastion of Isenloft",
+      "Summit, the Unforgiving",
+      "Winter's Wail"
+    ],
+    "notes": "Exact text 'create a Frostbite'. Broad need, any-of."
+  },
+  {
+    "id": "card-banish-opp-hand",
+    "query": "cards that banish cards from my opponent's hand",
+    "kind": "card",
+    "match": "any",
+    "expected": [
+      "Arakni, Black Widow",
+      "Cull",
+      "Felling of the Crown",
+      "Mark of the Black Widow",
+      "Mask of Recurring Nightmares",
+      "Stone Rain",
+      "Widespread Annihilation"
+    ],
+    "notes": "Exact text 'banish ... from ... hand' (opponent's)."
+  },
+  {
+    "id": "card-look-at-hand",
+    "query": "cards that let me look at my opponent's hand",
+    "kind": "card",
+    "match": "any",
+    "expected": [
+      "Blue Fin Harpoon",
+      "Bonds of Agony",
+      "Dead Eye",
+      "Dominia",
+      "King Kraken Harpoon",
+      "King Shark Harpoon",
+      "Persuasive Prognosis",
+      "Plan for the Worst",
+      "Red Fin Harpoon",
+      "Succumb to Temptation",
+      "Surgical Extraction",
+      "The Weakest Link",
+      "Yellow Fin Harpoon"
+    ],
+    "notes": "Exact text 'look at (their|the opponent's) hand'."
+  },
+  {
+    "id": "card-battleworn-head",
+    "query": "head equipment with battleworn",
+    "kind": "card",
+    "match": "any",
+    "expected": [
+      "Arcanite Skullcap",
+      "Evo Sentry Base Head",
+      "Evo Tekloscope",
+      "Head Stone",
+      "Helm of Isen's Peak",
+      "Helm of Sharp Eye"
+    ],
+    "notes": "Battleworn keyword + Head subtype (first 6 of 11 by name; any-of). Multi-constraint: type + keyword."
+  },
+  {
+    "id": "rule-eot-expiry",
+    "query": "when do 'until end of turn' effects wear off?",
+    "kind": "rule",
+    "match": "any",
+    "expected": [
+      "cr4.4.4",
+      "cr4.4.*"
+    ],
+    "notes": "CR 4.4.4 (End Phase end-of-turn procedure)."
+  },
+  {
+    "id": "rule-hit-definition",
+    "query": "what counts as a hit in combat?",
+    "kind": "rule",
+    "match": "any",
+    "expected": [
+      "gloss:Hit"
+    ],
+    "notes": "Glossary 'Hit' (cr1.-1.138)."
+  },
+  {
+    "id": "rule-life-loss-vs-damage",
+    "query": "is losing life the same as taking damage?",
+    "kind": "rule",
+    "match": "any",
+    "expected": [
+      "gloss:Life Loss",
+      "gloss:Damage"
+    ],
+    "notes": "Either glossary entry answers the contrast."
+  },
+  {
+    "id": "rule-banished-zone",
+    "query": "can I play cards from my banished zone?",
+    "kind": "rule",
+    "match": "any",
+    "expected": [
+      "cr3.4.*"
+    ],
+    "notes": "Section 3.4 Banished (zone rules)."
+  },
+  {
+    "id": "rule-arsenal-timing",
+    "query": "when can I put a card into my arsenal?",
+    "kind": "rule",
+    "match": "any",
+    "expected": [
+      "cr4.4.*",
+      "cr3.3.*"
+    ],
+    "notes": "End Phase arsenal step / Arsenal zone rules."
+  },
+  {
+    "id": "rule-legendary-copies",
+    "query": "how many copies of a Legendary card can I have in my deck?",
+    "kind": "rule",
+    "match": "any",
+    "expected": [
+      "gloss:Legendary",
+      "cr8.3.*"
+    ],
+    "notes": "Glossary 'Legendary' or the 8.3.x ability-keyword rule."
   }
 ]

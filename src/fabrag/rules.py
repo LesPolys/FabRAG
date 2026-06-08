@@ -69,8 +69,14 @@ CHAPTER_SLUGS = [
 ]
 
 # Size knobs (characters ~ 4 chars/token, so 1500 chars ~ 375 tokens).
-# These are *tuning parameters* — Phase 5's eval harness will let us measure
-# whether other values retrieve better instead of guessing.
+# Swept in Phase 8 (scripts/sweep_chunks.py) on the PRODUCTION path (merged
+# corpus, hybrid mode) against the gold set's rule cases: recall@8 saturates
+# at 1.0 for every size from 1000 up, and MRR/nDCG peak right here —
+# 0.792/0.844 at 1500/3000 vs 0.779/0.834 at 2200/4400 and 0.658 MRR at
+# 600/1200. The original guess survived measurement; it is now a CHOICE.
+# (A first sweep on a rules-only retriever said bigger was better — but
+# rules-only BM25 statistics differ from the merged corpus's. Measure the
+# system, not a flattering simplification.)
 DEFAULT_TARGET_CHARS = 1500   # stop packing a chunk once it passes this
 DEFAULT_MAX_CHARS = 3000      # a single rule group beyond this gets split
 

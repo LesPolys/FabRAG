@@ -44,6 +44,14 @@ from .retrieval import (
 )
 from .rules import RuleChunk
 
+# Fraction of a mixed top-k reserved for rules (the rest goes to cards).
+# Swept in Phase 8 (scripts/sweep_quota.py) over the full gold set on the
+# production pipeline: at k=8, three rules slots (0.40) beat two (0.30) —
+# rules recall 0.850 -> 0.950, overall 0.737 -> 0.781, for a card-side cost
+# of only 0.018. A fourth slot bought nothing. Note the knob is stepwise at
+# small k: it only acts at the k_rules breakpoints.
+RULES_SHARE = 0.40
+
 # A retrieval result with no documents needs no LLM call — we answer directly.
 _NO_MATCH_MSG = (
     "Nothing in the corpus matched your query and filters, so there's nothing "
@@ -136,6 +144,7 @@ def retrieve(
     k: int = 8,
     source: Source = "all",
     mode: Mode = "hybrid",
+    rules_share: float = RULES_SHARE,
     filters: CardFilter | None = None,
     predicate: Callable[[Card], bool] | None = None,
     retriever: Retriever | None = None,
@@ -156,7 +165,7 @@ def retrieve(
         return retriever.search(
             question, k=k, predicate=scope(source, filters, predicate), mode=mode
         )
-    k_rules = max(2, round(k * 0.3))
+    k_rules = max(2, round(k * rules_share))
     k_cards = max(1, k - k_rules)
     cards = retriever.search(
         question, k=k_cards, predicate=scope("cards", filters, predicate), mode=mode
